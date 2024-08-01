@@ -1,0 +1,15 @@
+[package]
+name = "origami-macros"
+version = "0.1.0-alpha.1"
+edition = "2021"
+description = "Macros for origami-engine"
+license = "MIT"
+repository = "https://github.com/ratnaraj7/origami"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.86"
+quote = "1.0.36"
+syn = { version = "2.0.72", features = ["extra-traits", "full"] }

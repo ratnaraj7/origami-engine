@@ -1,0 +1,6 @@
+[workspace]
+members = [
+	"origami-engine",
+	"origami-macros",
+]
+resolver = "2"
