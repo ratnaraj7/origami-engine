@@ -11,9 +11,8 @@ categories = ["template-engine"]
 [dependencies]
 origami-macros = { path = "../origami-macros", version = "0.1.0-alpha.1", default-features = false }
 
-
 [features]
-default = []
+default = ["origami-macros/html-escape"]
 axum = ["origami-macros/axum"]
 html-escape = ["origami-macros/html-escape"]
 
