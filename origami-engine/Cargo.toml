@@ -9,3 +9,15 @@ keywords = ["templates", "engine", "markup", "html", "web"]
 categories = ["template-engine"]
 
 [dependencies]
+origami-macros = { path = "../origami-macros", version = "0.1.0-alpha.1", default-features = false }
+
+
+[features]
+default = []
+axum = ["origami-macros/axum"]
+html-escape = ["origami-macros/html-escape"]
+
+[dev-dependencies]
+axum = "0.7.5"
+html-escape = "0.2.13"
+trybuild = "1.0.99"

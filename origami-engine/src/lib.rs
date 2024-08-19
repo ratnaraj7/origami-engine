@@ -1,14 +1,12 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+pub use origami_macros::og;
+
+pub trait Layout<T> {
+    fn extend(&self, s: &mut String, blocks: &T);
+    fn extend_with_childrens(&self, s: &mut String, blocks: &T, childrens: impl Fn(&mut String));
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub trait Origami {
+    fn to_html(&self) -> String;
+    fn push_html_to_string(&self, s: &mut String);
+    fn push_html_to_string_with_childrens(&self, s: &mut String, childrens: impl Fn(&mut String));
 }

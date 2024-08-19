@@ -1,14 +1,17 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::parse_macro_input;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use self::origami::Origami;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+mod origami;
+mod utils;
+
+#[proc_macro]
+pub fn og(input: TokenStream) -> TokenStream {
+    let origami = parse_macro_input!(input as Origami);
+    quote! {
+        #origami
     }
+    .into()
 }
