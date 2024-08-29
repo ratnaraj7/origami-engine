@@ -403,7 +403,7 @@ impl Children {
 }
 
 fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
-    // always false because childrens inside block can't betop level
+    // always false because childrens inside block can't be top level
     pc.is_top_level = false;
     #[cfg(feature = "html_escape")]
     pc.parse_escape_no_escape(input)?;
