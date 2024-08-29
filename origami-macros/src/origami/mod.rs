@@ -88,14 +88,14 @@ impl Parse for Origami {
             } else {
                 None
             },
-            #[cfg(feature = "html-escape")]
+            #[cfg(feature = "html_escape")]
             escape: true,
         };
 
         while !input.is_empty() {
             pc.is_top_level = true;
-            #[cfg(feature = "html-escape")]
-            if cfg!(feature = "html-escape") {
+            #[cfg(feature = "html_escape")]
+            if cfg!(feature = "html_escape") {
                 pc.escape = true;
             }
             match children_type {
