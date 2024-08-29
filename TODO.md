@@ -12,7 +12,7 @@
 - [ ] Minify scripts and styles using [`minify-html`](https://crates.io/crates/minify-html)
 - [ ] Enable moving scripts and styles to desired positions when used inside components (if possible)
 - [ ] Write the README documentation
-  - [ ] Create a website in docs workspace based on the README using any markdown to html crates (like [pulldown-cmark](https://crates.io/crates/pulldown-cmark))
+  - [ ] Create a website in docs workspace based on the README using any markdown to HTML crates (like [pulldown-cmark](https://crates.io/crates/pulldown-cmark))
   - [ ] Write doctests using [`skeptic`](https://crates.io/crates/skeptic)
 - [ ] Add [`tailwind_fuse`](https://crates.io/crates/tailwind_fuse) feature
 
@@ -21,3 +21,7 @@
 - [ ] Write benchmarks using [`criterion`](https://crates.io/crates/criterion) to measure and optimize performance
 - [ ] Refactor code for readability and maintainability
 - [ ] Document API endpoints
+
+### Ideas
+
+- [ ] Macro calling another macro for blocks, consolidation, etc.
