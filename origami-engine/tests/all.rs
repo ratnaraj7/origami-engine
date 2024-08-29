@@ -1,4 +1,4 @@
-use origami_engine::{og, Layout, Origami};
+use origami_engine::{og, Origami};
 
 #[test]
 fn should_have_attributes_in_order() {
@@ -17,7 +17,49 @@ fn should_have_attributes_in_order() {
     .to_html();
     assert_eq!(
         html,
-        "<div class=\"foo\" hx-get=\"/foo\" baz=\"baz\" bar></div>"
+        "<div class=\"foo\" hx-get=\"/foo\" bar baz=\"baz\"></div>"
+    );
+}
+
+#[test]
+fn should_consolidate_attributes_in_order_with_value() {
+    struct Foo {
+        baz: String,
+    }
+    og! {
+        Foo =>
+        div class="foo" "hx-get"="/foo" bar baz=(self.baz.as_str()) bar="bar" {
+
+        }
+    }
+    let html = Foo {
+        baz: "baz".to_string(),
+    }
+    .to_html();
+    assert_eq!(
+        html,
+        "<div class=\"foo\" hx-get=\"/foo\" bar=\"bar\" baz=\"baz\"></div>"
+    );
+}
+
+#[test]
+fn should_consolidate_attributes_in_order_with_value_2() {
+    struct Foo {
+        baz: String,
+    }
+    og! {
+        Foo =>
+        div class="foo" "hx-get"="/foo" bar="baz" baz=(self.baz.as_str()) bar="bar" {
+
+        }
+    }
+    let html = Foo {
+        baz: "baz".to_string(),
+    }
+    .to_html();
+    assert_eq!(
+        html,
+        "<div class=\"foo\" hx-get=\"/foo\" bar=\"bar\" baz=\"baz\"></div>"
     );
 }
 
