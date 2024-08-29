@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
@@ -42,7 +43,7 @@ impl Context {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 enum AttributeKey {
     LitStr(LitStr),
     LitChar(LitChar),
@@ -120,11 +121,17 @@ impl Parse for AttributeValue {
 }
 
 #[derive(Debug)]
-pub(super) struct Attributes(HashMap<AttributeKey, Option<AttributeValue>>);
+pub(super) struct Attributes(
+    HashMap<AttributeKey, Option<AttributeValue>>,
+    // for key ordering
+    Vec<AttributeKey>,
+);
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut map = HashMap::new();
+        let mut position_map = HashMap::new();
+        let mut count = 0;
         while !input.peek(Brace) && !input.peek(Token![;]) {
             let key = input.parse::<AttributeKey>()?;
             let value = match key {
@@ -140,27 +147,34 @@ impl Parse for Attributes {
                     }
                 }
             };
-            map.insert(key, value);
+            map.insert(key.clone(), value);
+            position_map.insert(key, count);
+            count += 1;
         }
-        Ok(Self(map))
+        let mut positions: Vec<_> = position_map.into_iter().collect();
+        positions.sort_by(|a, b| a.1.cmp(&b.1));
+        let positions: Vec<_> = positions.into_iter().map(|(key, _)| key).collect();
+        Ok(Self(map, positions))
     }
 }
 
 impl ToTokens for Attributes {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        for (k, v) in &self.0 {
+        for k in &self.1 {
+            let v = match self.0.get(k) {
+                Some(v) => v,
+                None => unreachable!(),
+            };
             match k {
                 AttributeKey::Ident(ident) => {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
                     let literal = ident.to_string();
-                    let span = ident.span();
                     let literal: LitStr = parse_quote! {
                         #literal
                     };
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push_str(#literal);
                     });
                 }
@@ -168,9 +182,7 @@ impl ToTokens for Attributes {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
-                    let span = literal.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push_str(#literal);
                     });
                 }
@@ -178,54 +190,42 @@ impl ToTokens for Attributes {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
-                    let span = literal.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push(#literal);
                     });
                 }
-                AttributeKey::Iter(expr) => {
-                    let span = expr.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
-                        for (key, val) in #expr.iter() {
-                            s.push(' ');
-                            s.push_str(key);
-                            s.push('=');
-                            s.push('"');
-                            s.push_str(val);
-                            s.push('"');
-                        }
-                    })
-                }
+                AttributeKey::Iter(expr) => tokens.extend(quote_spanned! {
+                    expr.span() =>
+                    for (key, val) in #expr.iter() {
+                        s.push(' ');
+                        s.push_str(key);
+                        s.push_str("=\"");
+                        s.push_str(val);
+                        s.push('"');
+                    }
+                }),
                 #[cfg(feature = "html-escape")]
                 AttributeKey::Escape | AttributeKey::NoEscape => {}
             }
 
             if let Some(v) = v {
                 tokens.extend(quote! {
-                    s.push('=');
-                    s.push('"');
+                    s.push_str("=\"");
                 });
                 match v {
                     AttributeValue::LitStr(literal) => {
-                        let span = literal.span();
-                        tokens.extend(quote_spanned! {
-                            span=>
+                        tokens.extend(quote! {
                             s.push_str(#literal);
                         });
                     }
                     AttributeValue::LitChar(literal) => {
-                        let span = literal.span();
-                        tokens.extend(quote_spanned! {
-                            span=>
+                        tokens.extend(quote! {
                             s.push(#literal);
                         });
                     }
                     AttributeValue::Expr(expr) => {
-                        let span = expr.span();
                         tokens.extend(quote_spanned! {
-                            span=>
+                            expr.span() =>
                             s.push_str(#expr);
                         });
                     }
