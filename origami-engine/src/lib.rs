@@ -10,3 +10,6 @@ pub trait Origami {
     fn push_html_to_string(&self, s: &mut String);
     fn push_html_to_string_with_childrens(&self, s: &mut String, childrens: impl Fn(&mut String));
 }
+
+#[cfg(feature = "html_escape")]
+pub use html_escape::encode_text_to_string;
