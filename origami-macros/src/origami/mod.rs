@@ -4,7 +4,6 @@ use syn::spanned::Spanned;
 use syn::{Expr, ExprStruct, Ident, Path, Token, Visibility};
 
 mod children;
-mod attributes;
 use crate::origami::children::{Children, Context};
 use crate::utils::bail;
 use crate::utils::kw::{layout, size_hint};

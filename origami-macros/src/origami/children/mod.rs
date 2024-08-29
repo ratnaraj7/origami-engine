@@ -10,7 +10,8 @@ use syn::{braced, parenthesized, Expr, ExprStruct, Ident, LitChar, LitStr, Token
 use crate::utils::bail;
 use crate::utils::kw::{block, childrens, escape, extend, include, noescape};
 
-use super::attributes::{AttributeKey, Attributes};
+pub(super) mod attributes;
+pub(super) use self::attributes::{AttributeKey, Attributes};
 
 pub(super) type Childrens = Vec<Children>;
 

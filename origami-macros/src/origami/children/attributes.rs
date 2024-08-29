@@ -10,7 +10,7 @@ use crate::utils::bail;
 use crate::utils::kw::{escape, noescape};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
-pub(super) enum AttributeKey {
+pub enum AttributeKey {
     LitStr(LitStr),
     LitChar(LitChar),
     Ident(Ident),
@@ -62,7 +62,7 @@ impl Parse for AttributeKey {
 }
 
 #[derive(Debug)]
-pub(super) enum AttributeValue {
+pub enum AttributeValue {
     LitStr(LitStr),
     LitChar(LitChar),
     Expr(Expr),
@@ -86,7 +86,7 @@ impl Parse for AttributeValue {
 }
 
 #[derive(Debug)]
-pub(super) struct Attributes(
+pub struct Attributes(
     pub HashMap<AttributeKey, Option<AttributeValue>>,
     // for key ordering
     Vec<AttributeKey>,
