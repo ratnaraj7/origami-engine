@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
@@ -24,12 +25,12 @@ pub(super) struct Context {
     pub(super) is_top_level: bool,
     pub(super) is_extended: bool,
     pub(super) block_names: Option<Vec<Ident>>,
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     pub(super) escape: bool,
 }
 
 impl Context {
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     fn parse_escape_no_escape(&mut self, input: ParseStream) -> syn::Result<()> {
         if input.peek(escape) {
             input.parse::<escape>()?;
@@ -42,35 +43,35 @@ impl Context {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 enum AttributeKey {
     LitStr(LitStr),
     LitChar(LitChar),
     Ident(Ident),
     Iter(ExprField),
 
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     Escape,
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     NoEscape,
 }
 
 impl Parse for AttributeKey {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         if input.peek(escape) {
-            if cfg!(not(feature = "html-escape")) {
-                bail!(input, "Enable `html-escape` feature to use `\"escape\"`.")
+            if cfg!(not(feature = "html_escape")) {
+                bail!(input, "Enable `html_escape` feature to use `\"escape\"`.")
             }
             input.parse::<escape>()?;
-            #[cfg(feature = "html-escape")]
+            #[cfg(feature = "html_escape")]
             return Ok(Self::Escape);
         }
         if input.peek(noescape) {
-            if cfg!(not(feature = "html-escape")) {
-                bail!(input, "Enable `html-escape` feature to use `\"noescape\"`.")
+            if cfg!(not(feature = "html_escape")) {
+                bail!(input, "Enable `html_escape` feature to use `\"noescape\"`.")
             }
             input.parse::<noescape>()?;
-            #[cfg(feature = "html-escape")]
+            #[cfg(feature = "html_escape")]
             return Ok(Self::NoEscape);
         }
         if input.peek(Ident) {
@@ -120,16 +121,22 @@ impl Parse for AttributeValue {
 }
 
 #[derive(Debug)]
-pub(super) struct Attributes(HashMap<AttributeKey, Option<AttributeValue>>);
+pub(super) struct Attributes(
+    HashMap<AttributeKey, Option<AttributeValue>>,
+    // for key ordering
+    Vec<AttributeKey>,
+);
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut map = HashMap::new();
+        let mut position_map = HashMap::new();
+        let mut count = 0;
         while !input.peek(Brace) && !input.peek(Token![;]) {
             let key = input.parse::<AttributeKey>()?;
             let value = match key {
                 AttributeKey::Iter(_) => None,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 AttributeKey::Escape | AttributeKey::NoEscape => None,
                 _ => {
                     if input.peek(Token![=]) {
@@ -140,27 +147,34 @@ impl Parse for Attributes {
                     }
                 }
             };
-            map.insert(key, value);
+            map.insert(key.clone(), value);
+            position_map.insert(key, count);
+            count += 1;
         }
-        Ok(Self(map))
+        let mut positions: Vec<_> = position_map.into_iter().collect();
+        positions.sort_by(|a, b| a.1.cmp(&b.1));
+        let positions: Vec<_> = positions.into_iter().map(|(key, _)| key).collect();
+        Ok(Self(map, positions))
     }
 }
 
 impl ToTokens for Attributes {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        for (k, v) in &self.0 {
+        for k in &self.1 {
+            let v = match self.0.get(k) {
+                Some(v) => v,
+                None => unreachable!(),
+            };
             match k {
                 AttributeKey::Ident(ident) => {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
                     let literal = ident.to_string();
-                    let span = ident.span();
                     let literal: LitStr = parse_quote! {
                         #literal
                     };
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push_str(#literal);
                     });
                 }
@@ -168,9 +182,7 @@ impl ToTokens for Attributes {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
-                    let span = literal.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push_str(#literal);
                     });
                 }
@@ -178,54 +190,42 @@ impl ToTokens for Attributes {
                     tokens.extend(quote! {
                         s.push(' ');
                     });
-                    let span = literal.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
+                    tokens.extend(quote! {
                         s.push(#literal);
                     });
                 }
-                AttributeKey::Iter(expr) => {
-                    let span = expr.span();
-                    tokens.extend(quote_spanned! {
-                        span=>
-                        for (key, val) in #expr.iter() {
-                            s.push(' ');
-                            s.push_str(key);
-                            s.push('=');
-                            s.push('"');
-                            s.push_str(val);
-                            s.push('"');
-                        }
-                    })
-                }
-                #[cfg(feature = "html-escape")]
+                AttributeKey::Iter(expr) => tokens.extend(quote_spanned! {
+                    expr.span() =>
+                    for (key, val) in #expr.iter() {
+                        s.push(' ');
+                        s.push_str(key);
+                        s.push_str("=\"");
+                        s.push_str(val);
+                        s.push('"');
+                    }
+                }),
+                #[cfg(feature = "html_escape")]
                 AttributeKey::Escape | AttributeKey::NoEscape => {}
             }
 
             if let Some(v) = v {
                 tokens.extend(quote! {
-                    s.push('=');
-                    s.push('"');
+                    s.push_str("=\"");
                 });
                 match v {
                     AttributeValue::LitStr(literal) => {
-                        let span = literal.span();
-                        tokens.extend(quote_spanned! {
-                            span=>
+                        tokens.extend(quote! {
                             s.push_str(#literal);
                         });
                     }
                     AttributeValue::LitChar(literal) => {
-                        let span = literal.span();
-                        tokens.extend(quote_spanned! {
-                            span=>
+                        tokens.extend(quote! {
                             s.push(#literal);
                         });
                     }
                     AttributeValue::Expr(expr) => {
-                        let span = expr.span();
                         tokens.extend(quote_spanned! {
-                            span=>
+                            expr.span() =>
                             s.push_str(#expr);
                         });
                     }
@@ -258,13 +258,13 @@ pub(super) enum HtmlChildrens {
 pub(super) enum Children {
     Text {
         text: LitStr,
-        #[cfg(feature = "html-escape")]
+        #[cfg(feature = "html_escape")]
         escape: bool,
     },
     Expr {
         expr: Expr,
         iterating: bool,
-        #[cfg(feature = "html-escape")]
+        #[cfg(feature = "html_escape")]
         escape: bool,
     },
     Comp(Component),
@@ -285,7 +285,7 @@ pub(super) enum Children {
     },
     Include {
         expr: Expr,
-        #[cfg(feature = "html-escape")]
+        #[cfg(feature = "html_escape")]
         escape: bool,
     },
     ComponentChildrenUse(Span),
@@ -308,7 +308,7 @@ impl Children {
             let text: LitStr = input.parse()?;
             return Ok(Children::Text {
                 text,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape: if input.peek(Token![!]) {
                     input.parse::<Token![!]>()?;
                     false
@@ -328,7 +328,7 @@ impl Children {
                 false
             };
             let expr: Expr = content.parse()?;
-            #[cfg(feature = "html-escape")]
+            #[cfg(feature = "html_escape")]
             let escape = if input.peek(Token![!]) {
                 input.parse::<Token![!]>()?;
                 false
@@ -339,7 +339,7 @@ impl Children {
             return Ok(Children::Expr {
                 expr,
                 iterating,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape,
             });
         }
@@ -355,7 +355,7 @@ impl Children {
         if input.peek(include) {
             input.parse::<include>()?;
             let expr = input.parse::<Expr>()?;
-            #[cfg(feature = "html-escape")]
+            #[cfg(feature = "html_escape")]
             let escape = if input.peek(Token![!]) {
                 input.parse::<Token![!]>()?;
                 false
@@ -365,7 +365,7 @@ impl Children {
             input.parse::<Token![;]>()?;
             return Ok(Children::Include {
                 expr,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape,
             });
         }
@@ -405,7 +405,7 @@ impl Children {
 fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
     // always false because childrens inside block can't betop level
     pc.is_top_level = false;
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     pc.parse_escape_no_escape(input)?;
     let content;
     braced!(content in input);
@@ -495,11 +495,11 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     let tag: Ident = input.parse()?;
 
     let attrs: Attributes = input.parse()?;
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     if attrs.0.contains_key(&AttributeKey::Escape) {
         pc.escape = true;
     }
-    #[cfg(feature = "html-escape")]
+    #[cfg(feature = "html_escape")]
     if attrs.0.contains_key(&AttributeKey::NoEscape) {
         pc.escape = false;
     }
@@ -544,13 +544,13 @@ impl ToTokens for Children {
         match self {
             Children::Text {
                 text,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape,
             } => {
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 if *escape {
                     return tokens.extend(quote! {
-                        ::html_escape::encode_text_to_string(#text, s);
+                        ::origami_engine::encode_text_to_string(#text, s);
                     });
                 }
                 tokens.extend(quote! {
@@ -560,16 +560,16 @@ impl ToTokens for Children {
             Children::Expr {
                 expr,
                 iterating,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape,
             } => {
                 if *iterating {
                     let span = expr.span();
-                    #[cfg(feature = "html-escape")]
+                    #[cfg(feature = "html_escape")]
                     if *escape {
                         return tokens.extend(quote_spanned! {
                             span=>
-                            ::html_escape::encode_text_to_string(#expr.join(""), s);
+                            ::origami_engine::encode_text_to_string(#expr.join(""), s);
                         });
                     }
                     tokens.extend(quote_spanned! {
@@ -578,11 +578,11 @@ impl ToTokens for Children {
                     })
                 } else {
                     let span = expr.span();
-                    #[cfg(feature = "html-escape")]
+                    #[cfg(feature = "html_escape")]
                     if *escape {
                         return tokens.extend(quote_spanned! {
                             span=>
-                            ::html_escape::encode_text_to_string(#expr,s);
+                            ::origami_engine::encode_text_to_string(#expr,s);
                         });
                     }
                     tokens.extend(quote_spanned! {
@@ -709,15 +709,15 @@ impl ToTokens for Children {
             }
             Children::Include {
                 expr,
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 escape,
             } => {
                 let span = expr.span();
-                #[cfg(feature = "html-escape")]
+                #[cfg(feature = "html_escape")]
                 if *escape {
                     return tokens.extend(quote_spanned! {
                         span=>
-                        ::html_escape::encode_text_to_string(include_str!(#expr), s);
+                        ::origami_engine::encode_text_to_string(include_str!(#expr), s);
                     });
                 }
                 tokens.extend(quote_spanned! {
