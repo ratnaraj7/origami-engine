@@ -143,6 +143,7 @@ impl ToTokens for Attributes {
                         attribute_types.push(AttributeType::Lit(lit));
                     }
                 }
+                // TODO: consolidate keys
                 AttributeKey::Iter(expr) => {
                     attribute_types.push(AttributeType::TokenStream(quote_spanned! {
                         expr.span() =>
