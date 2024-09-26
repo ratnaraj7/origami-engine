@@ -4,7 +4,8 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
-use syn::{braced, Expr, Ident, LitStr, Macro, Token};
+use syn::token::{Comma, FatArrow, If};
+use syn::{braced, Expr, Ident, LitStr, Macro, Pat, Token};
 
 use crate::utils::kw::{escape, include, noescape};
 use crate::utils::{bail, combine_to_lit};
@@ -41,6 +42,14 @@ pub(super) enum HtmlChildrens {
 }
 
 #[derive(Debug)]
+pub(super) struct CustomMatchArm {
+    body: Childrens,
+    pat: Pat,
+    guard: Option<(If, Expr)>,
+    comma: Option<Comma>,
+}
+
+#[derive(Debug)]
 pub(super) enum Children {
     Text {
         text: LitStr,
@@ -71,6 +80,10 @@ pub(super) enum Children {
         tag: Ident,
         attrs: Attributes,
         childrens: HtmlChildrens,
+    },
+    Match {
+        expr: Expr,
+        arms: Vec<CustomMatchArm>,
     },
     Include {
         expr: Expr,
@@ -138,6 +151,9 @@ impl Children {
         }
         if input.peek(Token![for]) {
             return parse_for(input, pc);
+        }
+        if input.peek(Token![match]) {
+            return parse_match(input, pc);
         }
         if input.peek(Ident) {
             return parse_html(input, pc);
@@ -241,6 +257,36 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
         attrs,
         childrens: HtmlChildrens::Childrens(parse_block(input, pc)?),
     })
+}
+
+fn parse_match(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
+    input.parse::<Token![match]>()?;
+    let expr: Expr = input.parse()?;
+    let mut arms = Vec::new();
+    let content;
+    braced!(content in input);
+    while !content.is_empty() {
+        let pat = Pat::parse_multi(&content)?;
+        let guard = if content.peek(Token![if]) {
+            Some((content.parse::<Token![if]>()?, content.parse()?))
+        } else {
+            None
+        };
+        content.parse::<Token![=>]>()?;
+        let body = parse_block(&content, pc)?;
+        let comma = if content.peek(Token![,]) {
+            Some(content.parse::<Token![,]>()?)
+        } else {
+            None
+        };
+        arms.push(CustomMatchArm {
+            pat,
+            guard,
+            body,
+            comma,
+        })
+    }
+    Ok(Children::Match { expr, arms })
 }
 
 pub(super) struct ChildrensE {
@@ -396,6 +442,38 @@ fn children_to_token(children: &Children, s: &Expr) -> proc_macro2::TokenStream 
                         #attrs
                         #s.push_str("/>");
                     }
+                }
+            }
+        }
+        Children::Match { expr, arms } => {
+            let mut arms_t = TokenStream::new();
+            for CustomMatchArm {
+                body,
+                pat,
+                guard,
+                comma,
+            } in arms
+            {
+                let mut childrens_t = TokenStream::new();
+                for children in body {
+                    childrens_t.extend(children_to_token(children, s));
+                }
+                let guard = if let Some((if_, expr)) = guard {
+                    quote! {
+                        #if_ #expr
+                    }
+                } else {
+                    quote! {}
+                };
+                arms_t.extend(quote! {
+                    #pat #guard => {
+                        #childrens_t
+                    }#comma
+                })
+            }
+            quote! {
+                match #expr {
+                    #arms_t
                 }
             }
         }

@@ -128,3 +128,29 @@ fn should_work_with_loops() {
         "<div><div>1,2</div><div>3,4</div><div>5,6</div></div>"
     );
 }
+
+#[test]
+fn should_work_with_match_expression() {
+    comp! {
+        component =>
+        div {
+            match $value {
+                "bar" => {
+                     "bar_component"
+                },
+                "baz" => {
+                     "baz_component"
+                },
+                _ => {
+                     "foo_component"
+                },
+            }
+        }
+    }
+    let html = component!(value { "bar" });
+    let html2 = component!(value { "baz" });
+    let html3 = component!(value { "" });
+    assert_eq!(html.0, "<div>bar_component</div>");
+    assert_eq!(html2.0, "<div>baz_component</div>");
+    assert_eq!(html3.0, "<div>foo_component</div>");
+}
