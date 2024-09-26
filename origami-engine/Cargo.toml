@@ -11,10 +11,11 @@ categories = ["template-engine"]
 [dependencies]
 origami-macros = { path = "../origami-macros", version = "0.1.0-alpha.1", default-features = false }
 html-escape = { version = "0.2.13", optional = true }
+axum = { version = "0.7.6", optional = true }
 
 [features]
 default = ["html_escape"]
-axum = ["origami-macros/axum"]
+axum = ["dep:axum"]
 html_escape = ["origami-macros/html_escape", "dep:html-escape"]
 
 [dev-dependencies]
