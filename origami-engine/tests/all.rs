@@ -1,5 +1,4 @@
 use origami_engine::comp;
-use origami_macros::anon;
 
 #[test]
 fn should_work_with_expr() {
