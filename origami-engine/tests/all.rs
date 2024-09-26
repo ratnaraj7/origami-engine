@@ -1,187 +1,131 @@
-use origami_engine::{og, Origami};
+use origami_engine::comp;
+use origami_macros::anon;
 
 #[test]
-fn should_have_attributes_in_order() {
-    struct Foo {
-        baz: String,
-    }
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" bar baz=(self.baz.as_str()) bar {
-
+fn should_work_with_expr() {
+    let expr = "foo_bar";
+    let expr = &expr;
+    comp! {
+        baz =>
+        div {
+            **expr;
         }
     }
-    let html = Foo {
-        baz: "baz".to_string(),
+    let html = baz!();
+    assert_eq!(html.0, "<div>foo_bar</div>");
+}
+
+#[test]
+fn should_be_self_closing() {
+    comp! {
+        component =>
+        input;
     }
-    .to_html();
+    let html = component!();
+    assert_eq!(html.0, "<input/>");
+}
+
+#[test]
+fn should_order_attributes_correctly() {
+    comp! {
+        component =>
+        div hello="world" abc="def" hello abc="xyz" {}
+
+    }
+    let html = component!();
+    assert_eq!(html.0, "<div hello abc=\"xyz\"></div>");
+}
+
+#[test]
+fn should_order_attributes_correctly_when_using_placeholder() {
+    comp! {
+        component =>
+        div hello="world" abc="def" $attr {}
+
+    }
+    let html = component!(attr {
+        hello abc="xyz"
+    });
+    assert_eq!(html.0, "<div hello abc=\"xyz\"></div>");
+}
+
+#[test]
+fn should_work_with_multiple_nested_components() {
+    comp! {
+        foo =>
+        div {
+            "foo_component"
+        }
+    }
+    comp! {
+        bar =>
+        div {
+            "bar_component"
+            @foo!();
+        }
+    }
+    comp! {
+        baz =>
+        div {
+            "baz_component"
+            @bar!();
+        }
+    }
+    let html = baz!();
     assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\" bar baz=\"baz\"></div>"
+        html.0,
+        "<div>baz_component<div>bar_component<div>foo_component</div></div></div>"
     );
 }
 
 #[test]
-fn should_consolidate_attributes_in_order_with_value() {
-    struct Foo {
-        baz: String,
-    }
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" bar baz=(self.baz.as_str()) bar="bar" {
-
-        }
-    }
-    let html = Foo {
-        baz: "baz".to_string(),
-    }
-    .to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\" bar=\"bar\" baz=\"baz\"></div>"
-    );
-}
-
-#[test]
-fn should_consolidate_attributes_in_order_with_value_2() {
-    struct Foo {
-        baz: String,
-    }
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" bar="baz" baz=(self.baz.as_str()) bar="bar" {
-
-        }
-    }
-    let html = Foo {
-        baz: "baz".to_string(),
-    }
-    .to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\" bar=\"bar\" baz=\"baz\"></div>"
-    );
-}
-
-#[cfg(feature = "html_escape")]
-#[test]
-fn should_work_with_component() {
-    struct Bar;
-    og! {
-        Bar =>
-        div class="bar" "hx-get"="/bar" {
-            "bar"
-        }
-    }
-    struct Foo;
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            @Bar{};
-        }
-    }
-    let html = Foo.to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\"><div class=\"bar\" hx-get=\"/bar\">bar</div></div>"
-    );
-}
-
-#[cfg(feature = "html_escape")]
-#[test]
-fn should_iterate_components() {
-    #[derive(Clone)]
-    struct Bar;
-    og! {
-        Bar =>
-        div class="bar" "hx-get"="/bar" {
-            "bar"
-        }
-    }
-    struct Foo {
-        bars: Vec<Bar>,
-    }
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            @(..self.bars.iter());
-        }
-    }
-    let html = Foo { bars: vec![Bar; 3] }.to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\"><div class=\"bar\" hx-get=\"/bar\">bar</div><div class=\"bar\" hx-get=\"/bar\">bar</div><div class=\"bar\" hx-get=\"/bar\">bar</div></div>"
-    );
-}
-
-#[test]
-#[cfg(feature = "html_escape")]
-fn should_escape_lit() {
-    struct Foo;
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            "<div class=\"foo\" hx-get=\"/foo\">foo</div>"
-        }
-    }
-    let html = Foo.to_html();
-    assert_eq!(html, "<div class=\"foo\" hx-get=\"/foo\">&lt;div class=\"foo\" hx-get=\"/foo\"&gt;foo&lt;/div&gt;</div>");
-}
-
-#[cfg(not(feature = "html_escape"))]
-#[test]
-fn should_not_escape_lit() {
-    struct Foo;
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            "<div class=\"foo\" hx-get=\"/foo\">foo</div>"
-        }
-    }
-
-    let html = Foo.to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\"><div class=\"foo\" hx-get=\"/foo\">foo</div></div>"
-    );
-}
-
-#[cfg(feature = "html_escape")]
-#[test]
-fn should_not_escape_anything_inside_noescape_block() {
-    struct Foo;
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            div noescape class="foo" "hx-get"="/foo" {
-                "<div class=\"foo\" hx-get=\"/foo\">foo</div>"
+fn should_work_with_conditionals() {
+    comp! {
+        foo =>
+        div {
+            if $bar == "bar" {
+                "bar_component"
+            } else if $baz == "baz" {
+                "baz_component"
+            } else {
+                "foo_component"
             }
         }
     }
-    let html = Foo.to_html();
-    assert_eq!(
-        html,
-        "<div class=\"foo\" hx-get=\"/foo\"><div class=\"foo\" hx-get=\"/foo\"><div class=\"foo\" hx-get=\"/foo\">foo</div></div></div>"
-    );
+    let html = foo!(bar { "bar" }, baz { "not_baz" });
+    let html2 = foo!(bar { "not_bar" }, baz { "baz" });
+    let html3 = foo!(bar { "not_bar" }, baz { "not_baz" });
+    assert_eq!(html.0, "<div>bar_component</div>");
+    assert_eq!(html2.0, "<div>baz_component</div>");
+    assert_eq!(html3.0, "<div>foo_component</div>");
 }
 
-#[cfg(feature = "html_escape")]
 #[test]
-fn should_not_escape_anything_inside_noescape_block_and_escape_everything_inside_escape_block() {
-    struct Foo;
-    og! {
-        Foo =>
-        div class="foo" "hx-get"="/foo" {
-            div noescape class="foo" "hx-get"="/foo" {
-                "<div class=\"foo\" hx-get=\"/foo\">foo</div>"
-                "<>hello"
-                div escape class="foo" "hx-get"="/foo" {
-                    "<div class=\"foo\" hx-get=\"/foo\">foo</div>"
+fn should_work_with_loops() {
+    struct Points {
+        x: i32,
+        y: i32,
+    }
+    let points = [
+        Points { x: 1, y: 2 },
+        Points { x: 3, y: 4 },
+        Points { x: 5, y: 6 },
+    ];
+    comp! {
+        foo =>
+        div {
+            for point in $points; {
+                div {
+                    *point.x.to_string().as_str();
+                    ","
+                    *point.y.to_string().as_str();
                 }
             }
         }
     }
-    let html = Foo.to_html();
-    assert_eq!(html,
-        "<div class=\"foo\" hx-get=\"/foo\"><div class=\"foo\" hx-get=\"/foo\"><div class=\"foo\" hx-get=\"/foo\">foo</div><>hello<div class=\"foo\" hx-get=\"/foo\">&lt;div class=\"foo\" hx-get=\"/foo\"&gt;foo&lt;/div&gt;</div></div></div>");
+    let html = foo!(points { points });
+    assert_eq!(
+        html.0,
+        "<div><div>1,2</div><div>3,4</div><div>5,6</div></div>"
+    );
 }
