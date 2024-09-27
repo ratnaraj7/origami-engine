@@ -2,9 +2,9 @@
 
 ### High Priority
 
-- [ ] Implement pattern matching
+- [x] Implement pattern matching
 - [ ] Write initial tests for critical components
-- [ ] Use `&mut String` for HTML escaping because [`html-escape::encode_text_to_string`](https://docs.rs/html-escape/0.2.13/html_escape/fn.encode_text_to_string.html) requires it, and use the original string for other operations instead of pointer indirection in `push_str`
+- [ ] ~~Use `&mut String` for HTML escaping because [`html-escape::encode_text_to_string`](https://docs.rs/html-escape/0.2.13/html_escape/fn.encode_text_to_string.html) requires it, and use the original string for other operations instead of pointer indirection in `push_str`
 - [ ] Consolidate attributes when iterating
 
 ### Medium Priority
@@ -24,4 +24,4 @@
 
 ### Ideas
 
-- [ ] Macro calling another macro for blocks, consolidation, etc.
+- [ ] ~~Macro calling another macro for blocks, consolidation, etc.
