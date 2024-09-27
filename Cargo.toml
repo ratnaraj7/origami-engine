@@ -2,6 +2,5 @@
 members = [
 	"origami-engine",
 	"origami-macros",
-	"docs",
 ]
 resolver = "2"
