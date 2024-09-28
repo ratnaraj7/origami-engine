@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
-use syn::token::{Comma, FatArrow, If};
+use syn::token::{Comma, If};
 use syn::{braced, Expr, Ident, LitStr, Macro, Pat, Token};
 
 use crate::utils::kw::{escape, include, noescape};
@@ -197,12 +197,14 @@ fn parse_component(input: ParseStream, pc: &mut Context) -> syn::Result<Children
 fn parse_conditional(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     let _span = input.parse::<Token![if]>()?.span();
     let if_cond = input.parse::<Expr>()?;
+    input.parse::<Token![;]>()?;
     let if_childrens = parse_block(input, pc)?;
     let mut else_ifs = Vec::new();
     while input.peek(Token![else]) && input.peek2(Token![if]) {
         input.parse::<Token![else]>()?;
         input.parse::<Token![if]>()?;
         let cond = input.parse::<Expr>()?;
+        input.parse::<Token![;]>()?;
         let childrens = parse_block(input, pc)?;
         else_ifs.push((cond, childrens));
     }
@@ -262,6 +264,9 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
 fn parse_match(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     input.parse::<Token![match]>()?;
     let expr: Expr = input.parse()?;
+    input.parse::<Token![;]>()?;
+    #[cfg(feature = "html_escape")]
+    pc.parse_escape_no_escape(input)?;
     let mut arms = Vec::new();
     let content;
     braced!(content in input);
