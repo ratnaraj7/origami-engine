@@ -12,9 +12,9 @@
 - [ ] Minify scripts and styles using [`minify-html`](https://crates.io/crates/minify-html)
 - [ ] Enable moving scripts and styles to desired positions when used inside components (if possible)
 - [ ] Write the README documentation
-  - [ ] Create a website in docs workspace based on the README using any markdown to HTML crates (like [pulldown-cmark](https://crates.io/crates/pulldown-cmark))
-  - [ ] Write doctests using [`skeptic`](https://crates.io/crates/skeptic)
-- [ ] Add [`tailwind_fuse`](https://crates.io/crates/tailwind_fuse) feature
+  - [ ] ~~Create a website in docs workspace based on the README using any markdown to HTML crates (like [pulldown-cmark](https://crates.io/crates/pulldown-cmark))~~
+  - [ ] ~~Write doctests using [`skeptic`](https://crates.io/crates/skeptic)~~
+- [ ] ~~Add [`tailwind_fuse`](https://crates.io/crates/tailwind_fuse) feature~~
 
 ### Low Priority
 
