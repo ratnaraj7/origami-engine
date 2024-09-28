@@ -82,9 +82,9 @@ fn should_work_with_conditionals() {
     comp! {
         foo =>
         div {
-            if $bar == "bar" {
+            if $bar == "bar"; {
                 "bar_component"
-            } else if $baz == "baz" {
+            } else if $baz == "baz"; {
                 "baz_component"
             } else {
                 "foo_component"
@@ -134,7 +134,7 @@ fn should_work_with_match_expression() {
     comp! {
         component =>
         div {
-            match $value {
+            match $value; noescape {
                 "bar" => {
                      "bar_component"
                 },
