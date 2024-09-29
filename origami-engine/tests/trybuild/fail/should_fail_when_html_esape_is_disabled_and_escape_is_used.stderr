@@ -1,0 +1,10 @@
+error: Enable `html_escape` feature to use `"escape"`.
+  --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_escape_is_used.rs:6:13
+   |
+6  |         div escape {
+   |             ^^^^^^
+...
+10 |     foo!();
+   |     ------ in this macro invocation
+   |
+   = note: this error originates in the macro `foo` (in Nightly builds, run with -Z macro-backtrace for more info)

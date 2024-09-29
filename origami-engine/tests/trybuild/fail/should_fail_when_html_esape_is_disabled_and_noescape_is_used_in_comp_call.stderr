@@ -1,0 +1,18 @@
+error: Invalid input for `Children`. Expected one of the following: `LitStr`, `if`, `@`, `self`/`..`, or `Ident`.
+  --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_noescape_is_used_in_comp_call.rs:13:17
+   |
+13 |         @bar!();!
+   |                 ^
+14 |     }
+15 |     foo!();
+   |     ------ in this macro invocation
+   |
+   = note: this error originates in the macro `foo` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused macro definition: `bar`
+ --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_noescape_is_used_in_comp_call.rs:5:9
+  |
+5 |         bar =>
+  |         ^^^
+  |
+  = note: `#[warn(unused_macros)]` on by default
