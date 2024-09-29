@@ -1,4 +1,4 @@
-# Origami Engine
+# origami-engine
 
 Origami Engine is a templating engine focused on modularity, designed for efficient HTML generation with powerful macros.
 
@@ -26,3 +26,7 @@ assert_eq!(html.0, "<div>Hello, World!</div>");
 # Documentation
 
 For comprehensive documentation and usage instructions, please visit [docs.rs](https://docs.rs/origami-engine/latest/origami_engine/).
+
+## License
+
+This project is licensed under the MIT License or the Apache License 2.0. See the [LICENSE-MIT](./LICENSE-MIT) and [LICENSE-APACHE](./LICENSE-APACHE) files for details.
