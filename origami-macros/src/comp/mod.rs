@@ -57,19 +57,19 @@ impl ToTokens for Component {
                   }
                   ::origami_engine::Origami(s)
               }};
-              ($s:expr => #(#vars {$($#vars:tt)*}),*) => {{
+              ($s:expr => #(#vars {$($#vars:tt)*}),*) => {
                   ::origami_engine::anon! {
                       $s,
                       #ts
                   }
-              }};
-              (noescape, $s:expr => #(#vars {$($#vars:tt)*}),*) => {{
+              };
+              (noescape, $s:expr => #(#vars {$($#vars:tt)*}),*) => {
                   ::origami_engine::anon! {
                       noescape,
                       $s,
                       #ts
                   }
-              }};
+              };
             }
         });
     }
