@@ -7,7 +7,7 @@ use syn::spanned::Spanned;
 use syn::token::{Comma, If};
 use syn::{braced, Expr, Ident, LitStr, Macro, Pat, Token};
 
-use crate::utils::kw::{escape, include, noescape};
+use crate::utils::kw::{escape, noescape};
 use crate::utils::{bail, combine_to_lit};
 
 pub(super) mod attributes;
@@ -85,11 +85,6 @@ pub(super) enum Children {
         expr: Expr,
         arms: Vec<CustomMatchArm>,
     },
-    Include {
-        expr: Expr,
-        #[cfg(feature = "html_escape")]
-        escape: bool,
-    },
     // TODO: pattern matching and handle script tag using macro_rules
     // to make it more convenient in terms of ordering
 }
@@ -115,6 +110,7 @@ impl Children {
         if input.peek(Token![*]) {
             input.parse::<Token![*]>()?;
             let expr: Expr = input.parse()?;
+            input.parse::<Token![;]>()?;
             #[cfg(feature = "html_escape")]
             let escape = if input.peek(Token![!]) {
                 input.parse::<Token![!]>()?;
@@ -122,7 +118,6 @@ impl Children {
             } else {
                 pc.escape
             };
-            input.parse::<Token![;]>()?;
             return Ok(Children::Expr {
                 expr,
                 #[cfg(feature = "html_escape")]
@@ -131,23 +126,6 @@ impl Children {
         }
         if input.peek(Token![if]) {
             return parse_conditional(input, pc);
-        }
-        if input.peek(include) {
-            input.parse::<include>()?;
-            let expr = input.parse::<Expr>()?;
-            #[cfg(feature = "html_escape")]
-            let escape = if input.peek(Token![!]) {
-                input.parse::<Token![!]>()?;
-                false
-            } else {
-                pc.escape
-            };
-            input.parse::<Token![;]>()?;
-            return Ok(Children::Include {
-                expr,
-                #[cfg(feature = "html_escape")]
-                escape,
-            });
         }
         if input.peek(Token![for]) {
             return parse_for(input, pc);
@@ -166,6 +144,7 @@ impl Children {
 }
 
 fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
+    #[cfg(feature = "html_escape")]
     pc.parse_escape_no_escape(input)?;
     let content;
     braced!(content in input);
@@ -480,21 +459,6 @@ fn children_to_token(children: &Children, s: &Expr) -> proc_macro2::TokenStream 
                 match #expr {
                     #arms_t
                 }
-            }
-        }
-        Children::Include {
-            expr,
-            #[cfg(feature = "html_escape")]
-            escape,
-        } => {
-            #[cfg(feature = "html_escape")]
-            if *escape {
-                return quote! {
-                    ::origami_engine::encode_text_to_string(include_str!(#expr), &mut #s);
-                };
-            }
-            quote! {
-                #s.push_str(include_str!(#expr));
             }
         }
     }
