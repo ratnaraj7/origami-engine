@@ -158,6 +158,7 @@ fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
 fn parse_component(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     input.parse::<Token![@]>()?;
     let comp = input.parse::<Macro>()?;
+    input.parse::<Token![;]>()?;
     #[cfg(feature = "html_escape")]
     let escape = if input.peek(Token![!]) {
         input.parse::<Token![!]>()?;
@@ -165,7 +166,6 @@ fn parse_component(input: ParseStream, pc: &mut Context) -> syn::Result<Children
     } else {
         pc.escape
     };
-    input.parse::<Token![;]>()?;
     Ok(Children::CompCall {
         comp,
         #[cfg(feature = "html_escape")]
