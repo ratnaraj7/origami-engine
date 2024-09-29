@@ -134,7 +134,7 @@ fn should_work_with_match_expression() {
     comp! {
         component =>
         div {
-            match $value; noescape {
+            match $value; {
                 "bar" => {
                      "bar_component"
                 },
@@ -153,4 +153,95 @@ fn should_work_with_match_expression() {
     assert_eq!(html.0, "<div>bar_component</div>");
     assert_eq!(html2.0, "<div>baz_component</div>");
     assert_eq!(html3.0, "<div>foo_component</div>");
+}
+
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_escape() {
+    comp! {
+        component =>
+        div {
+            "<div>foo_bar</div>"
+        }
+    }
+    let html = component!();
+    assert_eq!(html.0, "<div>&lt;div&gt;foo_bar&lt;/div&gt;</div>");
+}
+
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_inherit_parent_escape_state() {
+    comp! {
+        component =>
+        div noescape {
+            "<div>foo_bar</div>"
+            div {
+                "<div>foo_bar</div>"
+            }
+        }
+    }
+    let html = component!();
+    assert_eq!(
+        html.0,
+        "<div><div>foo_bar</div><div><div>foo_bar</div></div></div>"
+    );
+}
+
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_escape_inner() {
+    comp! {
+        component =>
+        div noescape {
+            "<div>foo_bar</div>"
+            div escape {
+                "<div>foo_bar</div>"
+            }
+        }
+    }
+    let html = component!();
+    assert_eq!(
+        html.0,
+        "<div><div>foo_bar</div><div>&lt;div&gt;foo_bar&lt;/div&gt;</div></div>"
+    );
+}
+
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_not_escape_expr() {
+    let expr = "<div>foo_bar</div>";
+    comp! {
+        component =>
+        div {
+            *expr;!
+        }
+    }
+    let html = component!();
+    assert_eq!(html.0, "<div><div>foo_bar</div></div>");
+}
+
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_not_escape_literal() {
+    comp! {
+        component =>
+        div {
+            "<div>foo_bar</div>"!
+        }
+    }
+    let html = component!();
+    assert_eq!(html.0, "<div><div>foo_bar</div></div>");
+}
+
+#[cfg(not(feature = "html_escape"))]
+#[test]
+fn should_not_escape() {
+    comp! {
+        component =>
+        div {
+            "<div>foo_bar</div>"
+        }
+    }
+    let html = component!();
+    assert_eq!(html.0, "<div><div>foo_bar</div></div>");
 }
