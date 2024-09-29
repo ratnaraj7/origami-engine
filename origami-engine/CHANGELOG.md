@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.0-alpha.1...origami-engine-v0.1.0-alpha.2) - 2024-09-29
+
+### Added
+
+- add `minify-html`, `minify_html` feature and reexport `minify-html`
+- add support for match expression
+- generate macros for components instead of structs
+- re-export html-escape for ease of use
+- add html-escape as optional dep
+
+### Fixed
+
+- [**breaking**] change feature name html-escape to html_escape
+- repository url
+
+### Other
+
+- update docs
+- update tests
+- add `#[doc(no_inline)]` for extern reexport crates
+- add license
+- update tests
+- update tests
+- update tests
+- update docs
+- update tests
+- add docs
+- update test
+- remove unused imports
+- add test for attributes
+- Merge pull request [#4](https://github.com/ratnaraj7/origami-engine/pull/4) from ratnaraj7/dev
+- update feature names
+
 ## [0.1.0-alpha.1](https://github.com/ratnaraj7/origami-engine/releases/tag/origami-engine-v0.1.0-alpha.1) - 2024-08-19
 
 ### Other
