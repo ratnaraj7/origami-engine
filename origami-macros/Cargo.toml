@@ -3,7 +3,7 @@ name = "origami-macros"
 version = "0.1.0-alpha.1"
 edition = "2021"
 description = "Macros for origami-engine"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/ratnaraj7/origami-engine"
 
 [lib]
