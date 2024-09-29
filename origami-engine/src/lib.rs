@@ -35,7 +35,7 @@
 /// let mut s = String::new();
 /// let bar = "dynamic_string";
 /// anon!(s, div {
-///     *format!("Hello, {}", bar); // Using format! as an expression
+///     *format!("Hello, {}", bar).as_str(); // Using format! as an expression
 /// });
 /// assert_eq!(s, "<div>Hello, dynamic_string</div>");
 /// ```
