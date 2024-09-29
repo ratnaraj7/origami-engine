@@ -233,6 +233,25 @@ fn should_not_escape_literal() {
     assert_eq!(html.0, "<div><div>foo_bar</div></div>");
 }
 
+#[cfg(feature = "html_escape")]
+#[test]
+fn should_not_escape_inner_comp() {
+    comp! {
+        bar =>
+        div {
+            "<div>foo_bar</div>"
+        }
+    }
+    comp! {
+        foo =>
+        div {
+            @bar!();!
+        }
+    }
+    let html = foo!();
+    assert_eq!(html.0, "<div><div><div>foo_bar</div></div></div>");
+}
+
 #[cfg(not(feature = "html_escape"))]
 #[test]
 fn should_not_escape() {
