@@ -1,12 +1,15 @@
 use std::fmt::Debug;
 
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::token::{Comma, If};
-use syn::{braced, Expr, Ident, LitStr, Macro, Pat, Token};
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Macro, Pat, Token};
 
+use crate::anon::children::attributes::AttributeValue;
+use crate::utils::kw::script_use;
+#[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
 use crate::utils::{bail, combine_to_lit};
 
@@ -49,6 +52,23 @@ pub(super) struct CustomMatchArm {
     comma: Option<Comma>,
 }
 
+/// Represents the content of a script or style tag,
+/// which can either be an expression (`Expr`) or a literal string (`LitStr`).
+#[derive(Debug)]
+pub enum ScriptOrStyleContent {
+    Expr(Expr),
+    LitStr(LitStr),
+}
+
+impl ToTokens for ScriptOrStyleContent {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            ScriptOrStyleContent::Expr(expr) => expr.to_tokens(tokens),
+            ScriptOrStyleContent::LitStr(lit) => lit.to_tokens(tokens),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(super) enum Children {
     Text {
@@ -85,8 +105,22 @@ pub(super) enum Children {
         expr: Expr,
         arms: Vec<CustomMatchArm>,
     },
-    // TODO: pattern matching and handle script tag using macro_rules
-    // to make it more convenient in terms of ordering
+    Script {
+        name: Option<LitStr>,
+        ty: ScriptOrStyleContent,
+        attrs: Attributes,
+        #[cfg(feature = "minify_html")]
+        minify: bool,
+    },
+    Style {
+        ty: ScriptOrStyleContent,
+        attrs: Attributes,
+        #[cfg(feature = "minify_html")]
+        minify: bool,
+    },
+    ScriptUse {
+        ident: Ident,
+    },
 }
 
 impl Children {
@@ -133,6 +167,12 @@ impl Children {
         if input.peek(Token![match]) {
             return parse_match(input, pc);
         }
+        if input.peek(script_use) {
+            input.parse::<script_use>()?;
+            return Ok(Children::ScriptUse {
+                ident: input.parse()?,
+            });
+        }
         if input.peek(Ident) {
             return parse_html(input, pc);
         }
@@ -155,7 +195,10 @@ fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
     Ok(childrens)
 }
 
-fn parse_component(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
+fn parse_component(
+    input: ParseStream,
+    #[allow(unused_variables)] pc: &mut Context,
+) -> syn::Result<Children> {
     input.parse::<Token![@]>()?;
     let comp = input.parse::<Macro>()?;
     input.parse::<Token![;]>()?;
@@ -217,6 +260,55 @@ fn parse_for(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
 fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     let tag: Ident = input.parse()?;
     let attrs: Attributes = input.parse()?;
+    if tag == "script" || tag == "style" {
+        #[cfg(feature = "html_escape")]
+        if attrs.0.contains_key(&AttributeKey::Escape)
+            || attrs.0.contains_key(&AttributeKey::NoEscape)
+        {
+            bail!(
+                input,
+                "Cannot use `escape` or `noescape` with `script` or `style`"
+            );
+        }
+        let content;
+        braced!(content in input);
+        let ty = if content.peek(LitStr) {
+            ScriptOrStyleContent::LitStr(content.parse()?)
+        } else {
+            ScriptOrStyleContent::Expr(content.parse()?)
+        };
+        #[cfg(feature = "minify_html")]
+        let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
+        if tag == "script" {
+            let name = if let Some(attr_val) =
+                attrs.0.get(&AttributeKey::Ident(parse_quote!(script_name)))
+            {
+                if let Some(AttributeValue::LitStr(name)) = attr_val {
+                    Some(name.clone())
+                } else {
+                    bail!(input, "`script_name` must be a string literal");
+                }
+            } else {
+                None
+            };
+            return Ok(Children::Script {
+                name,
+                ty,
+                attrs,
+                #[cfg(feature = "minify_html")]
+                minify,
+            });
+        }
+        if tag == "style" {
+            return Ok(Children::Style {
+                ty,
+                attrs,
+                #[cfg(feature = "minify_html")]
+                minify,
+            });
+        }
+        unreachable!()
+    }
     #[cfg(feature = "html_escape")]
     if attrs.0.contains_key(&AttributeKey::Escape) {
         pc.escape = true;
@@ -224,6 +316,13 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     #[cfg(feature = "html_escape")]
     if attrs.0.contains_key(&AttributeKey::NoEscape) {
         pc.escape = false;
+    }
+    #[cfg(feature = "minify_html")]
+    if attrs.0.contains_key(&AttributeKey::NoMinify) {
+        bail!(
+            input,
+            "`nominify` can only be used with `script` or `style` tags"
+        );
     }
     if input.peek(Token![;]) {
         input.parse::<Token![;]>()?;
@@ -459,6 +558,76 @@ fn children_to_token(children: &Children, s: &Expr) -> proc_macro2::TokenStream 
                 match #expr {
                     #arms_t
                 }
+            }
+        }
+        Children::Style {
+            ty,
+            attrs,
+            #[cfg(feature = "minify_html")]
+            minify,
+        } => {
+            let attrs = attribute_to_token(attrs, s);
+            #[cfg(feature = "minify_html")]
+            if *minify {
+                return quote! {
+                    #s.push_str("<style");
+                    #attrs
+                    #s.push_str(">");
+                    #s.extend(::origami_engine::minify(#ty.as_bytes(), &::origami_engine::Cfg{minify_css: true, ..Default::default()}).into_iter().map(|x| x as char));
+                    #s.push_str("</style>");
+                };
+            }
+            quote! {
+                #s.push_str("<style");
+                #attrs
+                #s.push_str(">");
+                #s.push_str(#ty);
+                #s.push_str("</style>");
+            }
+        }
+        Children::Script {
+            name,
+            ty,
+            attrs,
+            #[cfg(feature = "minify_html")]
+            minify,
+        } => {
+            let attrs = attribute_to_token(attrs, s);
+            #[allow(unused_mut)]
+            let mut body = quote! {
+                #s.push_str("<script");
+                #attrs
+                #s.push_str(">");
+                #s.push_str(#ty);
+                #s.push_str("</script>");
+            };
+            #[cfg(feature = "minify_html")]
+            if *minify {
+                body = quote! {
+                    #s.push_str("<script");
+                    #attrs
+                    #s.push_str(">");
+                    #s.extend(::origami_engine::minify(#ty.as_bytes(), &::origami_engine::Cfg {minify_js: true, ..Default::default()}).into_iter().map(|x| x as char));
+                    #s.push_str("</script>");
+                }
+            };
+            if let Some(name) = name {
+                let name = Ident::new(&name.value(), name.span());
+                quote! {
+                    macro_rules! #name {
+                        (javascript) => {
+                            #body
+                        }
+                    }
+                }
+            } else {
+                body
+            }
+        }
+        Children::ScriptUse { ident } => {
+            quote_spanned! {
+                ident.span() =>
+                #ident!(javascript);
             }
         }
     }

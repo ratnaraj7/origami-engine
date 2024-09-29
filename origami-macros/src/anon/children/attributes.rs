@@ -6,7 +6,7 @@ use syn::spanned::Spanned;
 use syn::token::Brace;
 use syn::{Expr, Ident, LitStr, Token};
 
-use crate::utils::kw::{escape, noescape};
+use crate::utils::kw::{escape, noescape, nominify};
 use crate::utils::{bail, combine_to_lit};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -18,6 +18,8 @@ pub enum AttributeKey {
     Escape,
     #[cfg(feature = "html_escape")]
     NoEscape,
+    #[cfg(feature = "minify_html")]
+    NoMinify,
 }
 
 impl Parse for AttributeKey {
@@ -37,6 +39,17 @@ impl Parse for AttributeKey {
             input.parse::<noescape>()?;
             #[cfg(feature = "html_escape")]
             return Ok(Self::NoEscape);
+        }
+        if input.peek(nominify) {
+            if cfg!(not(feature = "minify_html")) {
+                bail!(
+                    input,
+                    "It is not possible to use `\"nominify\"` without `minify_html` feature."
+                )
+            }
+            input.parse::<nominify>()?;
+            #[cfg(feature = "minify_html")]
+            return Ok(Self::NoMinify);
         }
         if input.peek(Ident) {
             return Ok(Self::Ident(input.parse()?));
@@ -121,6 +134,9 @@ pub fn attribute_to_token(attributes: &Attributes, s: &Expr) -> proc_macro2::Tok
     for (k, v) in &attributes.0 {
         let last = attribute_types.last_mut();
         match k {
+            AttributeKey::Ident(ident) if ident == "script_name" => {
+                continue;
+            }
             AttributeKey::Ident(ident) => {
                 if let Some(AttributeType::Lit(lit)) = last {
                     let new_lit =
@@ -155,6 +171,8 @@ pub fn attribute_to_token(attributes: &Attributes, s: &Expr) -> proc_macro2::Tok
             //}
             #[cfg(feature = "html_escape")]
             AttributeKey::Escape | AttributeKey::NoEscape => {}
+            #[cfg(feature = "minify_html")]
+            AttributeKey::NoMinify => {}
         }
         let last = attribute_types.last_mut();
         if let Some(v) = v {
