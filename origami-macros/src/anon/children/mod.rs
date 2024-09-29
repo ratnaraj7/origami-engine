@@ -169,9 +169,9 @@ impl Children {
         }
         if input.peek(script_use) {
             input.parse::<script_use>()?;
-            return Ok(Children::ScriptUse {
-                ident: input.parse()?,
-            });
+            let ident: Ident = input.parse()?;
+            input.parse::<Token![;]>()?;
+            return Ok(Children::ScriptUse { ident });
         }
         if input.peek(Ident) {
             return parse_html(input, pc);
