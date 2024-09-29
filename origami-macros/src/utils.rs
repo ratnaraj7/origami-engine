@@ -1,8 +1,8 @@
 pub mod kw {
     use syn::custom_keyword;
-    custom_keyword!(no_s);
+    custom_keyword!(nominify);
+    custom_keyword!(script_use);
     custom_keyword!(size_hint);
-    custom_keyword!(include);
     custom_keyword!(escape);
     custom_keyword!(noescape);
 }

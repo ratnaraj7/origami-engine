@@ -1,0 +1,10 @@
+error: Invalid input for `Children`. Expected one of the following: `LitStr`, `if`, `@`, `self`/`..`, or `Ident`.
+  --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_noescape_is_used_in_expr.rs:8:19
+   |
+8  |             *expr;!
+   |                   ^
+...
+11 |     foo!();
+   |     ------ in this macro invocation
+   |
+   = note: this error originates in the macro `foo` (in Nightly builds, run with -Z macro-backtrace for more info)

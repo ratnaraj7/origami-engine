@@ -4,6 +4,7 @@ use syn::{parse_quote, Expr, Token};
 
 mod children;
 
+#[cfg(feature = "html_escape")]
 use crate::utils::kw::{escape, noescape};
 
 use self::children::{Children, ChildrensE, Context};
@@ -14,20 +15,17 @@ pub struct Anon {
 
 impl Parse for Anon {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let escape = if cfg!(feature = "html_escape") {
-            if input.peek(escape) {
-                input.parse::<escape>()?;
-                input.parse::<Token![,]>()?;
-                true
-            } else if input.peek(noescape) {
-                input.parse::<noescape>()?;
-                input.parse::<Token![,]>()?;
-                false
-            } else {
-                true
-            }
-        } else {
+        #[cfg(feature = "html_escape")]
+        let escape = if input.peek(escape) {
+            input.parse::<escape>()?;
+            input.parse::<Token![,]>()?;
+            true
+        } else if input.peek(noescape) {
+            input.parse::<noescape>()?;
+            input.parse::<Token![,]>()?;
             false
+        } else {
+            true
         };
         let expr = if input.peek2(Token![,]) {
             let expr = input.parse::<Expr>()?;

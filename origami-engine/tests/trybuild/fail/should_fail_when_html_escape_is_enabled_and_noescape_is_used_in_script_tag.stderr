@@ -1,0 +1,13 @@
+error: Cannot use `escape` or `noescape` with `script` or `style`
+ --> tests/trybuild/fail/should_fail_when_html_escape_is_enabled_and_noescape_is_used_in_script_tag.rs:3:5
+  |
+3 | /     comp! {
+4 | |         foo =>
+5 | |         script noescape {
+... |
+8 | |     }
+  | |_____^
+9 |       foo!();
+  |       ------ in this macro invocation
+  |
+  = note: this error originates in the macro `foo` (in Nightly builds, run with -Z macro-backtrace for more info)
