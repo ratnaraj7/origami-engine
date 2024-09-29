@@ -264,3 +264,142 @@ fn should_not_escape() {
     let html = component!();
     assert_eq!(html.0, "<div><div>foo_bar</div></div>");
 }
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_minify_js() {
+    comp! {
+        component =>
+        script {
+            r#"function foo() {
+                return "hello world";
+            }"#
+        }
+    }
+    let html = component!();
+    assert_eq!(
+        html.0,
+        "<script>function foo() { return \"hello world\"; }</script>"
+    );
+}
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_not_minify_js() {
+    comp! {
+        component =>
+        script nominify {
+            r#"function foo() {
+                return "hello world";
+            }"#
+        }
+    }
+    let html = component!();
+    assert_eq!(
+        html.0,
+        r#"<script>function foo() {
+                return "hello world";
+            }</script>"#
+    );
+}
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_minify_style() {
+    comp! {
+        component =>
+        style {
+            r#"
+                body {
+                    background-color: red;
+                }
+            "#
+        }
+    }
+    let html = component!();
+    assert_eq!(html.0, "<style>body { background-color: red; }</style>");
+}
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_not_minify_style() {
+    comp! {
+        component =>
+        style nominify {
+            r#"
+                body {
+                    background-color: red;
+                }
+            "#
+        }
+    }
+    let html = component!();
+    assert_eq!(
+        html.0,
+        r#"<style>
+                body {
+                    background-color: red;
+                }
+            </style>"#
+    );
+}
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_move_script_when_minify_html_is_enabled() {
+    comp! {
+        bar =>
+        div {
+            "bar_component"
+            script script_name="bar_script" {
+                r#"function foo() {
+                    return "hello world";
+                }"#
+            }
+        }
+    }
+    comp! {
+        foo =>
+        div {
+            "foo_component"
+            @bar!();
+        }
+        script_use bar_script
+    }
+    let html = foo!();
+    assert_eq!(
+        html.0,
+        "<div>foo_component<div>bar_component</div></div><script>function foo() { return \"hello world\"; }</script>"
+    );
+}
+
+#[cfg(not(feature = "minify_html"))]
+#[test]
+fn should_move_script_when_minify_html_is_not_enabled() {
+    comp! {
+        bar =>
+        div {
+            "bar_component"
+            script script_name="bar_script" {
+                r#"function foo() {
+                    return "hello world";
+                }"#
+            }
+        }
+    }
+    comp! {
+        foo =>
+        div {
+            "foo_component"
+            @bar!();
+        }
+        script_use bar_script
+    }
+    let html = foo!();
+    assert_eq!(
+        html.0,
+        r#"<div>foo_component<div>bar_component</div></div><script>function foo() {
+                    return "hello world";
+                }</script>"#
+    );
+}
