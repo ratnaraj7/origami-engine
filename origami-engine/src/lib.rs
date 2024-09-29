@@ -123,9 +123,11 @@ pub use origami_macros::comp;
 pub struct Origami(pub String);
 
 #[cfg(feature = "html_escape")]
+#[doc(no_inline)]
 pub use html_escape::encode_text_to_string;
 
 #[cfg(feature = "minify_html")]
+#[doc(no_inline)]
 pub use minify_html::*;
 
 #[cfg(feature = "axum")]
