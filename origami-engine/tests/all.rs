@@ -364,7 +364,7 @@ fn should_move_script_when_minify_html_is_enabled() {
             "foo_component"
             @bar!();
         }
-        script_use bar_script
+        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(
@@ -393,7 +393,7 @@ fn should_move_script_when_minify_html_is_not_enabled() {
             "foo_component"
             @bar!();
         }
-        script_use bar_script
+        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(
