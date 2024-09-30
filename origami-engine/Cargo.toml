@@ -22,4 +22,9 @@ minify_html = ["origami-macros/minify_html", "dep:minify-html"]
 
 [dev-dependencies]
 axum = "0.7.5"
+criterion = "0.5.1"
 trybuild = "1.0.99"
+
+[[bench]]
+name = "origami"
+harness = false
