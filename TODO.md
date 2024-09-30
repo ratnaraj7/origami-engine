@@ -21,7 +21,7 @@
 
 ### Low Priority
 
-- [ ] Write benchmarks using [`criterion`](https://crates.io/crates/criterion) to measure and optimize performance
+- [x] Write benchmarks using [`criterion`](https://crates.io/crates/criterion) to measure and optimize performance
 
 ### Ideas
 
