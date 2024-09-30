@@ -383,6 +383,7 @@ pub use origami_macros::anon;
 /// ```
 pub use origami_macros::comp;
 
+#[derive(Debug, Clone)]
 pub struct Origami(pub String);
 
 #[cfg(feature = "html_escape")]
