@@ -12,7 +12,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: boa-dev/criterion-compare-action@v3
         with:
-          package: "origami-engine"
+          # `benchName` is required. Omitting it will result in an error: `Unrecognized option: 'save-baseline'`.
+          # Refer to the documentation for more details:
+          # https://github.com/boa-dev/criterion-compare-action?tab=readme-ov-file#unrecognized-option-save-baseline
           benchName: "origami"
           features: "html_escape,minify_html,axum"
           branchName: ${{ github.base_ref }}
