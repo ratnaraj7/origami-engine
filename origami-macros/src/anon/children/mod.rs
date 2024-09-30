@@ -58,6 +58,7 @@ pub(super) struct CustomMatchArm {
 pub enum ScriptOrStyleContent {
     Expr(Expr),
     LitStr(LitStr),
+    Empty,
 }
 
 impl ToTokens for ScriptOrStyleContent {
@@ -65,6 +66,7 @@ impl ToTokens for ScriptOrStyleContent {
         match self {
             ScriptOrStyleContent::Expr(expr) => expr.to_tokens(tokens),
             ScriptOrStyleContent::LitStr(lit) => lit.to_tokens(tokens),
+            ScriptOrStyleContent::Empty => tokens.extend(quote! { "" }),
         }
     }
 }
@@ -274,6 +276,8 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
         braced!(content in input);
         let ty = if content.peek(LitStr) {
             ScriptOrStyleContent::LitStr(content.parse()?)
+        } else if content.is_empty() {
+            ScriptOrStyleContent::Empty
         } else {
             ScriptOrStyleContent::Expr(content.parse()?)
         };
