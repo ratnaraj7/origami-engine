@@ -1,3 +1,7 @@
+permissions:
+  pull-requests: write
+  contents: write
+
 on: [pull_request]
 name: benchmark pull requests
 jobs:
