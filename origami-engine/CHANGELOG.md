@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.1...origami-engine-v0.1.2) - 2024-10-01
+
+### Added
+
+- implement `debug` and `clone` for `Origami`
+
+### Other
+
+- add full page bench
+- Merge pull request [#19](https://github.com/ratnaraj7/origami-engine/pull/19) from ratnaraj7/dev
+- add bench
+- add `[[bench]]` and criterion for benchmarking
+
 ## [0.1.1](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.0-alpha.2...origami-engine-v0.1.1) - 2024-09-30
 
 ### Other
