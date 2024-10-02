@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.3...origami-macros-v0.1.0-alpha.4) - 2024-10-02
+
+### Other
+
+- pass concat args to comp call
+- improve logic/optimize
+- use full path for `Span` in `combine_to_lit` macro
+- remove unnecessary quote
+- add `html_escape` and `minify_html` crate
+
 ## [0.1.0-alpha.3](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.2...origami-macros-v0.1.0-alpha.3) - 2024-09-30
 
 ### Other
