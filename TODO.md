@@ -9,7 +9,8 @@
 - [ ] ~~Use `&mut String` for HTML escaping because [`html-escape::encode_text_to_string`](https://docs.rs/html-escape/0.2.13/html_escape/fn.encode_text_to_string.html) requires it, and use the original string for other operations instead of pointer indirection in `push_str`~~
 - [ ] ~~Consolidate attributes when iterating~~
 - [x] For literals escape or minify at compile time
-- [ ] pass concat args while calling components
+- [x] pass concat args while calling components
+- [ ] Improve code quality
 
 ### Medium Priority
 
@@ -26,4 +27,7 @@
 
 ### Ideas
 
+- [ ] Returning concat args if possible
+- [ ] While `script_use` check if it is a literal, so that it can be use as a concat arg
+- [ ] Expressions with attributes
 - [ ] ~~Macro calling another macro for blocks, consolidation, etc.~~
