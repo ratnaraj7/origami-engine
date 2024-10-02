@@ -5,6 +5,7 @@ pub mod kw {
     custom_keyword!(size_hint);
     custom_keyword!(escape);
     custom_keyword!(noescape);
+    custom_keyword!(literals);
 }
 
 macro_rules! bail {
@@ -16,7 +17,7 @@ pub(crate) use bail;
 
 macro_rules! combine_to_lit {
     ($($input:expr),*) => {{
-        combine_to_lit!(@internal span => Span::call_site(), $($input),*)
+        combine_to_lit!(@internal span => ::proc_macro2::Span::call_site(), $($input),*)
     }};
     ($span:expr => $($input:expr),*) => {{
         combine_to_lit!(@internal span => $span, $($input),*)
