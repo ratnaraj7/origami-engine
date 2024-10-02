@@ -1,12 +1,14 @@
+#[cfg(feature = "minify_html")]
 use minify_html::Cfg;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::Parse;
-use syn::{parse_quote, Expr, Ident, LitStr, Macro, Token};
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Macro, Token};
 
 mod children;
 
 use crate::anon::children::CustomMatchArm;
 use crate::utils::combine_to_lit;
+use crate::utils::kw::literals;
 #[cfg(feature = "html_escape")]
 use crate::utils::kw::{escape, noescape};
 
@@ -18,10 +20,20 @@ use self::children::{
 pub struct Anon {
     expr: Expr,
     childrens: Childrens,
+    concat_args: Option<proc_macro2::TokenStream>,
 }
 
 impl Parse for Anon {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let concat_args = if input.peek(literals) {
+            input.parse::<literals>()?;
+            let content;
+            braced!(content in input);
+            input.parse::<Token![,]>()?;
+            Some(content.parse()?)
+        } else {
+            None
+        };
         #[cfg(feature = "html_escape")]
         let escape = if input.peek(escape) {
             input.parse::<escape>()?;
@@ -51,13 +63,17 @@ impl Parse for Anon {
         while !input.is_empty() {
             childrens.push(Children::parse(input, &mut ctx)?);
         }
-        Ok(Anon { expr, childrens })
+        Ok(Anon {
+            expr,
+            childrens,
+            concat_args,
+        })
     }
 }
 
 impl ToTokens for Anon {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let mut concat_args = proc_macro2::TokenStream::new();
+        let mut concat_args = self.concat_args.clone().unwrap_or_default();
         childrens_to_tokens(tokens, &self.childrens, &self.expr, &mut concat_args, false);
         concat_args_to_concat(tokens, &mut concat_args, &self.expr);
     }
@@ -135,12 +151,14 @@ fn extend_text(
     concat_args: &mut proc_macro2::TokenStream,
     #[cfg(feature = "html_escape")] escape: bool,
 ) {
-    extend_concat_args(
-        concat_args,
-        text,
-        #[cfg(feature = "html_escape")]
-        ProcessType::Escape(escape),
-    );
+    #[allow(unused)]
+    let mut process_type = ProcessType::None;
+    #[allow(clippy::unnecessary_operation)]
+    #[cfg(feature = "html_escape")]
+    {
+        process_type = ProcessType::Escape(escape)
+    };
+    extend_concat_args(concat_args, text, process_type);
 }
 
 fn expr_to_tokens(
@@ -194,7 +212,6 @@ fn comp_call_to_tokens(
     concat_args: &mut proc_macro2::TokenStream,
     #[cfg(feature = "html_escape")] escape: bool,
 ) {
-    concat_args_to_concat(ts, concat_args, s);
     let mut comp = comp.clone();
     comp.tokens = {
         #[allow(unused)]
@@ -207,11 +224,15 @@ fn comp_call_to_tokens(
         }
         let ts = comp.tokens;
         quote! {
+            literals {
+                #concat_args
+            },
             #escape_t
             #s =>
             #ts
         }
     };
+    *concat_args = proc_macro2::TokenStream::new();
     ts.extend(quote! {
         #comp;
     })
@@ -314,7 +335,7 @@ fn style_to_tokens(
     extend_concat_args(concat_args, &combine_to_lit!("<style"), ProcessType::None);
     attribute_to_token(ts, attrs, s, concat_args);
     extend_concat_args(concat_args, &combine_to_lit!(">"), ProcessType::None);
-    script_or_style_content_to_token(
+    script_or_style_content_to_tokens(
         ts,
         ty,
         concat_args,
@@ -348,7 +369,7 @@ fn script_to_tokens(
             &combine_to_lit!(">"),
             ProcessType::None,
         );
-        script_or_style_content_to_token(
+        script_or_style_content_to_tokens(
             &mut temp,
             ty,
             &mut temp_concat_args,
@@ -374,7 +395,7 @@ fn script_to_tokens(
         extend_concat_args(concat_args, &combine_to_lit!("<script"), ProcessType::None);
         attribute_to_token(ts, attrs, s, concat_args);
         extend_concat_args(concat_args, &combine_to_lit!(">"), ProcessType::None);
-        script_or_style_content_to_token(
+        script_or_style_content_to_tokens(
             ts,
             ty,
             concat_args,
@@ -390,29 +411,35 @@ fn script_to_tokens(
     }
 }
 
-fn script_or_style_content_to_token(
+fn script_or_style_content_to_tokens(
     ts: &mut proc_macro2::TokenStream,
     ty: &ScriptOrStyleContent,
     concat_args: &mut proc_macro2::TokenStream,
     s: &Expr,
     #[cfg(feature = "minify_html")] minify: Minify,
 ) {
+    #[allow(unused)]
+    let mut process_type = ProcessType::None;
+    #[cfg(feature = "minify_html")]
+    {
+        process_type = ProcessType::Minify(minify);
+    }
     match ty {
         ScriptOrStyleContent::LitStr(lit) => {
-            extend_concat_args(concat_args, lit, ProcessType::Minify(minify));
+            extend_concat_args(concat_args, lit, process_type);
         }
         ScriptOrStyleContent::Expr(expr) => {
             concat_args_to_concat(ts, concat_args, s);
-            match minify {
+            match process_type {
                 #[cfg(feature = "minify_html")]
-                Minify::Script => {
+                ProcessType::Minify(Minify::Script) => {
                     ts.extend(quote! {{
                         let temp_s = String::from_utf8_lossy(::origami_engine::minify(#expr.as_bytes(), &::origami_engine::Cfg{minify_js: true, ..Default::default()}).as_slice()).to_string();
                         #s.push_str(temp_s.as_str());
                     }});
                 }
                 #[cfg(feature = "minify_html")]
-                Minify::Style => {
+                ProcessType::Minify(Minify::Style) => {
                     ts.extend(quote! {{
                         let temp_s = String::from_utf8_lossy(::origami_engine::minify(#expr.as_bytes(), &::origami_engine::Cfg{minify_css: true, ..Default::default()}).as_slice()).to_string();
                         #s.push_str(temp_s.as_str());

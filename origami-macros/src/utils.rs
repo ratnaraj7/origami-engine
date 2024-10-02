@@ -5,6 +5,7 @@ pub mod kw {
     custom_keyword!(size_hint);
     custom_keyword!(escape);
     custom_keyword!(noescape);
+    custom_keyword!(literals);
 }
 
 macro_rules! bail {
