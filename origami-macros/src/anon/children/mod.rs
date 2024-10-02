@@ -1,20 +1,17 @@
 use std::fmt::Debug;
 
-use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::token::{Comma, If};
 use syn::{braced, parse_quote, Expr, Ident, LitStr, Macro, Pat, Token};
 
 use crate::anon::children::attributes::AttributeValue;
+use crate::utils::bail;
 use crate::utils::kw::script_use;
 #[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
-use crate::utils::{bail, combine_to_lit};
 
 pub(super) mod attributes;
-use self::attributes::attribute_to_token;
 pub(super) use self::attributes::{AttributeKey, Attributes};
 
 pub(super) type Childrens = Vec<Children>;
@@ -46,10 +43,10 @@ pub(super) enum HtmlChildrens {
 
 #[derive(Debug)]
 pub(super) struct CustomMatchArm {
-    body: Childrens,
-    pat: Pat,
-    guard: Option<(If, Expr)>,
-    comma: Option<Comma>,
+    pub(super) body: Childrens,
+    pub(super) pat: Pat,
+    pub(super) guard: Option<(If, Expr)>,
+    pub(super) comma: Option<Comma>,
 }
 
 /// Represents the content of a script or style tag,
@@ -59,16 +56,6 @@ pub enum ScriptOrStyleContent {
     Expr(Expr),
     LitStr(LitStr),
     Empty,
-}
-
-impl ToTokens for ScriptOrStyleContent {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            ScriptOrStyleContent::Expr(expr) => expr.to_tokens(tokens),
-            ScriptOrStyleContent::LitStr(lit) => lit.to_tokens(tokens),
-            ScriptOrStyleContent::Empty => tokens.extend(quote! { "" }),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -374,265 +361,4 @@ fn parse_match(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
         })
     }
     Ok(Children::Match { expr, arms })
-}
-
-pub(super) struct ChildrensE {
-    pub(super) childrens: Childrens,
-    pub(super) s: Expr,
-}
-
-impl ToTokens for ChildrensE {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let childrens = &self.childrens;
-        let s = &self.s;
-        for children in childrens {
-            tokens.extend(children_to_token(children, s));
-        }
-    }
-}
-
-fn children_to_token(children: &Children, s: &Expr) -> proc_macro2::TokenStream {
-    match children {
-        Children::Text {
-            text,
-            #[cfg(feature = "html_escape")]
-            escape,
-        } => {
-            #[cfg(feature = "html_escape")]
-            if *escape {
-                return quote! {
-                    ::origami_engine::encode_text_to_string(#text, &mut #s);
-                };
-            }
-            quote! {
-                #s.push_str(#text);
-            }
-        }
-        Children::Expr {
-            expr,
-            #[cfg(feature = "html_escape")]
-            escape,
-        } => {
-            #[cfg(feature = "html_escape")]
-            if *escape {
-                return quote! {
-                    ::origami_engine::encode_text_to_string(#expr, &mut #s);
-                };
-            }
-            quote! {
-                #s.push_str(#expr);
-            }
-        }
-        Children::CompCall {
-            comp,
-            #[cfg(feature = "html_escape")]
-            escape,
-        } => {
-            let mut comp = comp.clone();
-            comp.tokens = {
-                #[allow(unused)]
-                let mut escape_t = quote! {};
-                #[cfg(feature = "html_escape")]
-                if *escape {
-                    escape_t = quote! {};
-                } else {
-                    escape_t = quote! {noescape, };
-                }
-                let ts = comp.tokens;
-                quote! {
-                    #escape_t
-                    #s =>
-                    #ts
-                }
-            };
-            quote! {
-                #comp;
-            }
-        }
-        Children::Cond {
-            if_: (if_expr, if_childrens),
-            else_ifs,
-            else_,
-        } => {
-            let mut else_if_tokens = TokenStream::new();
-            for (else_if_expr, else_if_childrens) in else_ifs {
-                let mut else_if_childrens_t = TokenStream::new();
-                for children in else_if_childrens {
-                    else_if_childrens_t.extend(children_to_token(children, s));
-                }
-                else_if_tokens.extend(quote! {
-                    else if #else_if_expr {
-                        #else_if_childrens_t
-                    }
-                });
-            }
-            let mut if_childrens_t = TokenStream::new();
-            for children in if_childrens {
-                if_childrens_t.extend(children_to_token(children, s));
-            }
-            let mut else_t = TokenStream::new();
-            for children in else_ {
-                else_t.extend(children_to_token(children, s));
-            }
-            quote! {
-                if #if_expr {
-                    #if_childrens_t
-                }
-                #else_if_tokens
-                else {
-                    #else_t
-                }
-            }
-        }
-        Children::For {
-            expr_b,
-            expr_a,
-            childrens,
-        } => {
-            let mut childrens_t = TokenStream::new();
-            for children in childrens {
-                childrens_t.extend(children_to_token(children, s));
-            }
-            quote! {
-                for #expr_b in #expr_a {
-                    #childrens_t
-                }
-            }
-        }
-        Children::Html {
-            tag,
-            attrs,
-            childrens,
-        } => {
-            let tag_span = tag.span();
-            let tag = tag.to_string();
-            let left_arrow_with_tag = combine_to_lit!(tag_span => "<", tag);
-            let close_tag = combine_to_lit!(tag_span => "</", tag, ">");
-            let attrs = attribute_to_token(attrs, s);
-            match childrens {
-                HtmlChildrens::Childrens(childrens) => {
-                    let mut childrens_t = TokenStream::new();
-                    for children in childrens {
-                        childrens_t.extend(children_to_token(children, s));
-                    }
-                    quote! {
-                        #s.push_str(#left_arrow_with_tag);
-                        #attrs
-                        #s.push('>');
-                        #childrens_t
-                        #s.push_str(#close_tag);
-                    }
-                }
-                HtmlChildrens::SelfClosing => {
-                    quote! {
-                        #s.push_str(#left_arrow_with_tag);
-                        #attrs
-                        #s.push_str("/>");
-                    }
-                }
-            }
-        }
-        Children::Match { expr, arms } => {
-            let mut arms_t = TokenStream::new();
-            for CustomMatchArm {
-                body,
-                pat,
-                guard,
-                comma,
-            } in arms
-            {
-                let mut childrens_t = TokenStream::new();
-                for children in body {
-                    childrens_t.extend(children_to_token(children, s));
-                }
-                let guard = if let Some((if_, expr)) = guard {
-                    quote! {
-                        #if_ #expr
-                    }
-                } else {
-                    quote! {}
-                };
-                arms_t.extend(quote! {
-                    #pat #guard => {
-                        #childrens_t
-                    }#comma
-                })
-            }
-            quote! {
-                match #expr {
-                    #arms_t
-                }
-            }
-        }
-        Children::Style {
-            ty,
-            attrs,
-            #[cfg(feature = "minify_html")]
-            minify,
-        } => {
-            let attrs = attribute_to_token(attrs, s);
-            #[cfg(feature = "minify_html")]
-            if *minify {
-                return quote! {
-                    #s.push_str("<style");
-                    #attrs
-                    #s.push_str(">");
-                    #s.extend(::origami_engine::minify(#ty.as_bytes(), &::origami_engine::Cfg{minify_css: true, ..Default::default()}).into_iter().map(|x| x as char));
-                    #s.push_str("</style>");
-                };
-            }
-            quote! {
-                #s.push_str("<style");
-                #attrs
-                #s.push_str(">");
-                #s.push_str(#ty);
-                #s.push_str("</style>");
-            }
-        }
-        Children::Script {
-            name,
-            ty,
-            attrs,
-            #[cfg(feature = "minify_html")]
-            minify,
-        } => {
-            let attrs = attribute_to_token(attrs, s);
-            #[allow(unused_mut)]
-            let mut body = quote! {
-                #s.push_str("<script");
-                #attrs
-                #s.push_str(">");
-                #s.push_str(#ty);
-                #s.push_str("</script>");
-            };
-            #[cfg(feature = "minify_html")]
-            if *minify {
-                body = quote! {
-                    #s.push_str("<script");
-                    #attrs
-                    #s.push_str(">");
-                    #s.extend(::origami_engine::minify(#ty.as_bytes(), &::origami_engine::Cfg {minify_js: true, ..Default::default()}).into_iter().map(|x| x as char));
-                    #s.push_str("</script>");
-                }
-            };
-            if let Some(name) = name {
-                let name = Ident::new(&name.value(), name.span());
-                quote! {
-                    macro_rules! #name {
-                        (javascript) => {
-                            #body
-                        }
-                    }
-                }
-            } else {
-                body
-            }
-        }
-        Children::ScriptUse { ident } => {
-            quote_spanned! {
-                ident.span() =>
-                #ident!(javascript);
-            }
-        }
-    }
 }
