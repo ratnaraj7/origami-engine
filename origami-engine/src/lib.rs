@@ -89,7 +89,7 @@
 //!     };
 //! }
 //!
-//! let html = home!();
+//! let html = home!(cap => 250); // It is recommended to provide `cap` to avoid unnecessary reallocations and improve performance
 //! assert_eq!(
 //!     html.0,
 //!     r#"<nav><ul><li><a>Home</a></li><li><a>About</a></li><li><a>Contact</a></li></ul></nav><main><h1>Welcome to the Homepage!</h1><p>This is the main content of the homepage.</p></main><footer><p>© 2024 Your Company</p></footer>"#
@@ -106,7 +106,7 @@
 //!     };
 //! }
 //!
-//! let html = about!();
+//! let html = about!(cap => 250); // It is recommended to provide `cap` to avoid unnecessary reallocations and improve performance
 //! assert_eq!(
 //!     html.0,
 //!     r#"<nav><ul><li><a>Home</a></li><li><a>About</a></li><li><a>Contact</a></li></ul></nav><main><h1>About Us</h1><p>We are committed to delivering quality service.</p></main><footer><p>© 2024 Your Company</p></footer>"#
