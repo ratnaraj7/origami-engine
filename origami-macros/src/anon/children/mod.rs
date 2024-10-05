@@ -1,13 +1,14 @@
 use std::fmt::Debug;
 
-use syn::parse::ParseStream;
+use proc_macro2::TokenStream;
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::{Comma, If};
-use syn::{braced, parse_quote, Expr, Ident, LitStr, Macro, Pat, Token};
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Pat, Token};
 
 use crate::anon::children::attributes::AttributeValue;
 use crate::utils::bail;
-use crate::utils::kw::script_use;
+use crate::utils::kw::{call, script_use};
 #[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
 
@@ -71,7 +72,8 @@ pub(super) enum Children {
         escape: bool,
     },
     CompCall {
-        comp: Macro,
+        comp: Ident,
+        ts: TokenStream,
         #[cfg(feature = "html_escape")]
         escape: bool,
     },
@@ -127,11 +129,11 @@ impl Children {
                 },
             });
         }
-        if input.peek(Token![@]) {
+        if input.peek(call) {
             return parse_component(input, pc);
         }
-        if input.peek(Token![*]) {
-            input.parse::<Token![*]>()?;
+        if input.peek(Token![@]) {
+            input.parse::<Token![@]>()?;
             let expr: Expr = input.parse()?;
             input.parse::<Token![;]>()?;
             #[cfg(feature = "html_escape")]
@@ -188,9 +190,11 @@ fn parse_component(
     input: ParseStream,
     #[allow(unused_variables)] pc: &mut Context,
 ) -> syn::Result<Children> {
-    input.parse::<Token![@]>()?;
-    let comp = input.parse::<Macro>()?;
-    input.parse::<Token![;]>()?;
+    input.parse::<call>()?;
+    let comp = input.parse()?;
+    let content;
+    braced!(content in input);
+    let ts = content.call(TokenStream::parse)?;
     #[cfg(feature = "html_escape")]
     let escape = if input.peek(Token![!]) {
         input.parse::<Token![!]>()?;
@@ -200,6 +204,7 @@ fn parse_component(
     };
     Ok(Children::CompCall {
         comp,
+        ts,
         #[cfg(feature = "html_escape")]
         escape,
     })

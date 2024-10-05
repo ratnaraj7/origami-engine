@@ -1,40 +1,73 @@
+use indexmap::IndexSet;
 use proc_macro2::{Delimiter, TokenTree};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
-use syn::Token;
+use syn::token::Paren;
+use syn::{parenthesized, Ident, Token};
 
 use crate::utils::bail;
 
 pub struct Component {
     name: syn::Ident,
     ts: proc_macro2::TokenStream,
-    vars: Vec<syn::Ident>,
+    props: IndexSet<Ident>,
 }
 
 impl Parse for Component {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name = input.parse()?;
+        let mut props = IndexSet::new();
+        if input.peek(Paren) {
+            let content;
+            parenthesized!(content in input);
+            let mut count = 0;
+            while !content.is_empty() {
+                if count > 0 {
+                    if content.peek(Token![,]) {
+                        content.parse::<Token![,]>()?;
+                        if content.is_empty() {
+                            break;
+                        }
+                    } else {
+                        bail!(content, "Expected `,`");
+                    }
+                }
+                let prop: Ident = content.parse()?;
+                if props.contains(&prop) {
+                    bail!(prop, "Duplicate prop: `{}`");
+                }
+                props.insert(prop);
+                count += 1;
+            }
+        }
         input.parse::<Token![=>]>()?;
-        let (ts, vars) = macro_rep(input)?;
-        Ok(Component { name, ts, vars })
+        let ts = macro_rep(input, &props)?;
+        Ok(Component { name, ts, props })
     }
 }
 
 impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let vars = &self.vars;
+        let props = self.props.iter();
+        let front_comma_props = quote! {
+            #(, #props {$($#props:tt)*})*
+        };
+        let props = self.props.iter();
+        let back_comma_props = quote! {
+            #(#props {$($#props:tt)*}),*
+        };
         let name = &self.name;
         let ts = &self.ts;
         tokens.extend(quote! {
             macro_rules! #name {
-              (#(#vars {$($#vars:tt)*}),*) => {{
+              (#back_comma_props) => {{
                   let mut s = String::new();
                   ::origami_engine::anon! {
                       #ts
                   }
                   ::origami_engine::Origami(s)
               }};
-              (noescape, #(#vars {$($#vars:tt)*}),*) => {{
+              (noescape #front_comma_props) => {{
                   let mut s = String::new();
                   ::origami_engine::anon! {
                       noescape,
@@ -42,14 +75,14 @@ impl ToTokens for Component {
                   }
                   ::origami_engine::Origami(s)
               }};
-              (cap => $capacity:expr #(,#vars {$($#vars:tt)*})*) => {{
+              (cap => $capacity:expr #front_comma_props) => {{
                   let mut s = String::with_capacity($capacity);
                   ::origami_engine::anon! {
                       #ts
                   }
                   ::origami_engine::Origami(s)
               }};
-              (noescape, cap => $capacity:expr #(,#vars {$($#vars:tt)*})*) => {{
+              (noescape, cap => $capacity:expr #front_comma_props) => {{
                   let mut s = String::with_capacity($capacity);
                   ::origami_engine::anon! {
                       noescape,
@@ -57,16 +90,18 @@ impl ToTokens for Component {
                   }
                   ::origami_engine::Origami(s)
               }};
-              (literals { $($concat_args:tt)* }, $s:expr => #(#vars {$($#vars:tt)*}),*) => {
+              (literals { $($concat_args:tt)* }, return $return_ident:ident, $s:expr => #back_comma_props) => {
                   ::origami_engine::anon! {
                       literals { $($concat_args)* },
+                      return $return_ident,
                       $s,
                       #ts
                   }
               };
-              (literals { $($concat_args:tt)* }, noescape, $s:expr => #(#vars {$($#vars:tt)*}),*) => {
+              (literals { $($concat_args:tt)* }, return $return_ident:ident, noescape, $s:expr => #back_comma_props) => {
                   ::origami_engine::anon! {
                       literals { $($concat_args)* },
+                      return $return_ident,
                       noescape,
                       $s,
                       #ts
@@ -77,37 +112,34 @@ impl ToTokens for Component {
     }
 }
 
+#[derive(Debug)]
 enum Next {
     Ident,
     Any,
 }
 
-fn macro_rep(ps: ParseStream) -> syn::Result<(proc_macro2::TokenStream, Vec<syn::Ident>)> {
+fn macro_rep(ps: ParseStream, props: &IndexSet<Ident>) -> syn::Result<proc_macro2::TokenStream> {
     let mut ts = proc_macro2::TokenStream::new();
-    let mut vars = Vec::new();
-    let mut next = Next::Any;
     while !ps.is_empty() {
-        let token = ps.parse::<TokenTree>()?;
-        ts.extend(handle_token(
-            &mut next,
-            token.into_token_stream(),
-            &mut vars,
-        )?);
+        ts.extend(ps.parse::<TokenTree>()?.into_token_stream());
     }
-    Ok((ts, vars))
+    let mut next = Next::Any;
+    let ts = handle_token(&mut next, ts, props)?;
+    Ok(ts)
 }
 
 fn handle_token(
     next: &mut Next,
     o_ts: proc_macro2::TokenStream,
-    vars: &mut Vec<syn::Ident>,
+    props: &IndexSet<Ident>,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let mut ts = proc_macro2::TokenStream::new();
-    for token in o_ts {
+    let mut o_ts_i = o_ts.into_iter();
+    while let Some(token) = o_ts_i.next() {
         match (&next, &token) {
             (Next::Any, TokenTree::Group(group)) => {
                 if let Delimiter::Brace = group.delimiter() {
-                    let rts = handle_token(next, group.stream(), vars)?;
+                    let rts = handle_token(next, group.stream(), props)?;
                     ts.extend(quote! {
                         {
                             #rts
@@ -118,19 +150,24 @@ fn handle_token(
                     ts.extend(token.into_token_stream());
                 }
             }
-            (Next::Any, TokenTree::Punct(p)) if p.as_char() == '$' => {
+            (Next::Any, TokenTree::Punct(p)) if p.as_char() == '@' => {
                 *next = Next::Ident;
             }
             (Next::Ident, _) => {
-                if let TokenTree::Ident(ident) = token {
-                    ts.extend(quote! {
-                        $($#ident)*
-                    });
-                    *next = Next::Any;
-                    vars.push(ident);
-                    continue;
+                let n_token = o_ts_i.next();
+                match (&token, &n_token) {
+                    (TokenTree::Ident(ident), Some(TokenTree::Punct(n_t)))
+                        if props.contains(ident) && n_t.as_char() == ';' =>
+                    {
+                        ts.extend(quote! {
+                            $($#ident)*
+                        });
+                    }
+                    _ => ts.extend(quote! {
+                        @#token #n_token
+                    }),
                 }
-                bail!(token, "expected an identifier");
+                *next = Next::Any;
             }
             _ => {
                 ts.extend(token.into_token_stream());
