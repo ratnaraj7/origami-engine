@@ -18,13 +18,13 @@ fn bench_escape(c: &mut Criterion) {
     comp! {
         expression_without_escape =>
         div {
-            *expr;!
+            @expr;!
         }
     }
     comp! {
         expression_with_escape =>
         div {
-            *expr;
+            @expr;
         }
     }
     c.bench_function("literal without escape", |b| {
@@ -83,13 +83,13 @@ fn bench_minify(c: &mut Criterion) {
 
 fn bench_full_page(c: &mut Criterion) {
     comp! {
-        button_component =>
-        button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" $attr {
-            $label
+        button_component(attr, label) =>
+        button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" @attr; {
+            @label;
         }
     }
     comp! {
-        layout_component =>
+        layout_component(content) =>
         nav {
             ul {
                 li { a { "Home" } }
@@ -98,7 +98,7 @@ fn bench_full_page(c: &mut Criterion) {
             }
         }
         main {
-            $content
+            @content;
         }
         footer {
             p { "© 2024 Your Company" }
@@ -112,18 +112,18 @@ fn bench_full_page(c: &mut Criterion) {
     let status = "success";
     comp! {
         home =>
-        @layout_component! {
+        call layout_component {
             content {
                 h1 { "Welcome to the Homepage!" }
                 p { "This is the main content of the homepage." }
-                @button_component! { attr { onclick="alert('clicked')" }, label { "Click Me" } };
+                call button_component { attr { onclick="alert('clicked')" }, label { "Click Me" } }
                 if show_extra_content; {
                     p { "Here is some extra content that is conditionally rendered." }
                 }
                 h2 { "List of Items:" }
                 ul {
                     for item in items.iter(); {
-                        li { *item; }
+                        li { @item; }
                     }
                 }
                 match status; {
@@ -144,7 +144,7 @@ fn bench_full_page(c: &mut Criterion) {
                     "<div>This will not be escaped: <strong>Unsafe HTML</strong></div>"
                 }
             }
-        };
+        }
         script_use layout_script;
     }
     c.bench_function("full page", |b| b.iter(|| black_box(home!(cap => 800))));
