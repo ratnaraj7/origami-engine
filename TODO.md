@@ -30,4 +30,5 @@
 - [ ] Returning concat args if possible
 - [ ] While `script_use` check if it is a literal, so that it can be use as a concat arg
 - [ ] Expressions with attributes
+- [ ] Access modifiers for generated component macros
 - [ ] ~~Macro calling another macro for blocks, consolidation, etc.~~
