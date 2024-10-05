@@ -9,9 +9,9 @@
 //!
 //! // Define a button component that takes props
 //! comp! {
-//!     button_component =>
-//!     button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" $attr {
-//!         $label
+//!     button_component(attr, label) =>
+//!     button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" @attr; {
+//!         @label;
 //!     }
 //! }
 //!
@@ -21,7 +21,7 @@
 //!     div {
 //!         h1 { "Welcome to the Homepage!" }
 //!         // Use the button_component with props
-//!         @button_component! { attr { onclick="alert('clicked')" }, label { "Click Me" } };
+//!         call button_component { attr { onclick="alert('clicked')" }, label { "Click Me" } }
 //!     }
 //! }
 //!
@@ -39,7 +39,7 @@
 //!         h1 { "About Us" }
 //!         p { "We are committed to delivering quality service." }
 //!         // Use the button_component with props
-//!         @button_component! { attr { onclick="alert('clicked learn more')" }, label { "Learn More" } };
+//!         call button_component { attr { onclick="alert('clicked learn more')" }, label { "Learn More" } }
 //!     }
 //! }
 //!
@@ -59,7 +59,7 @@
 //!
 //! // Define a layout component with a navigation bar, body, and footer
 //! comp! {
-//!     layout_component =>
+//!     layout_component(content) =>
 //!     // Navigation bar
 //!     nav {
 //!         ul {
@@ -70,7 +70,7 @@
 //!     }
 //!     // Body placeholder for dynamic content
 //!     main {
-//!         $content
+//!         @content;
 //!     }
 //!     // Footer
 //!     footer {
@@ -81,15 +81,16 @@
 //! // Define the homepage component using the layout
 //! comp! {
 //!     home =>
-//!     @layout_component! {
+//!     call layout_component {
 //!         content {
 //!             h1 { "Welcome to the Homepage!" }
 //!             p { "This is the main content of the homepage." }
 //!         }
-//!     };
+//!     }
 //! }
 //!
-//! let html = home!(cap => 250); // It is recommended to provide `cap` to avoid unnecessary reallocations and improve performance
+//! let html = home!(cap => 250); // It is recommended to provide `cap`, i.e., the maximum length of html
+//!                              // to avoid unnecessary reallocations of strings
 //! assert_eq!(
 //!     html.0,
 //!     r#"<nav><ul><li><a>Home</a></li><li><a>About</a></li><li><a>Contact</a></li></ul></nav><main><h1>Welcome to the Homepage!</h1><p>This is the main content of the homepage.</p></main><footer><p>© 2024 Your Company</p></footer>"#
@@ -98,15 +99,16 @@
 //! // Define the about page component using the layout
 //! comp! {
 //!     about =>
-//!     @layout_component! {
+//!     call layout_component {
 //!         content {
 //!             h1 { "About Us" }
 //!             p { "We are committed to delivering quality service." }
 //!         }
-//!     };
+//!     }
 //! }
 //!
-//! let html = about!(cap => 250); // It is recommended to provide `cap` to avoid unnecessary reallocations and improve performance
+//! let html = about!(cap => 250); // It is recommended to provide `cap`, i.e., the maximum length of html
+//!                              // to avoid unnecessary reallocations of strings
 //! assert_eq!(
 //!     html.0,
 //!     r#"<nav><ul><li><a>Home</a></li><li><a>About</a></li><li><a>Contact</a></li></ul></nav><main><h1>About Us</h1><p>We are committed to delivering quality service.</p></main><footer><p>© 2024 Your Company</p></footer>"#
@@ -173,7 +175,7 @@
 //!     let text = "<div>foo</div>";
 //!     comp! {
 //!         foo =>
-//!         div { *text;! }
+//!         div { @text;! }
 //!     }
 //!
 //!     let html = foo!();
@@ -253,7 +255,7 @@
 //!     foo =>
 //!     div {
 //!         "foo_component"
-//!         @bar!(); // Include the bar component
+//!         call bar {} // Include the bar component
 //!     }
 //!     // Use the moveable script below the component call
 //!     script_use bar_script; // Include the script with the specified name
@@ -291,14 +293,14 @@
 /// let foo = "some_string";
 /// let mut s = String::new();
 /// anon!(s, div {
-///     *foo;
+///     @foo;
 /// });
 /// assert_eq!(s, "<div>some_string</div>");
 ///
 /// let mut s = String::new();
 /// let bar = "dynamic_string";
 /// anon!(s, div {
-///     *format!("Hello, {}", bar).as_str(); // Using format! as an expression
+///     @format!("Hello, {}", bar).as_str(); // Using format! as an expression
 /// });
 /// assert_eq!(s, "<div>Hello, dynamic_string</div>");
 /// ```
@@ -351,9 +353,9 @@
 /// anon!(s, div {
 ///     for point in points.iter(); {
 ///         div {
-///             *point.x.to_string().as_str();
+///             @point.x.to_string().as_str();
 ///             ", "
-///             *point.y.to_string().as_str();
+///             @point.y.to_string().as_str();
 ///         }
 ///     }
 /// });
@@ -370,10 +372,10 @@ pub use origami_macros::anon;
 /// use origami_macros::{comp};
 ///
 /// comp! {
-///     greeting_component =>
+///     greeting_component(name) =>
 ///     div {
 ///         "Hello, "
-///         $name
+///         @name;
 ///     }
 ///     
 /// }
