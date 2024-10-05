@@ -4,7 +4,7 @@ fn main() {
     comp! {
         foo =>
         div {
-            *"<div></div>";!
+            "<div></div>";!
         }
     }
     foo!();

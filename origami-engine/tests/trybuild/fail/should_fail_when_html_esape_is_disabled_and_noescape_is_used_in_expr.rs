@@ -5,7 +5,7 @@ fn main() {
     comp! {
         foo =>
         div {
-            *expr;!
+            @expr;!
         }
     }
     foo!();

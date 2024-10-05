@@ -7,7 +7,7 @@ fn should_work_with_expr() {
     comp! {
         baz =>
         div {
-            **expr;
+            @expr;
         }
     }
     let html = baz!();
@@ -38,10 +38,10 @@ fn should_order_attributes_correctly() {
 #[test]
 fn should_order_attributes_correctly_when_using_placeholder() {
     comp! {
-        component =>
-        div hello="world" abc="def" $attr {}
-
+        component(attr) =>
+        div hello="world" abc="def" @attr; {}
     }
+
     let html = component!(attr {
         hello abc="xyz"
     });
@@ -60,14 +60,14 @@ fn should_work_with_multiple_nested_components() {
         bar =>
         div {
             "bar_component"
-            @foo!();
+            call foo {}
         }
     }
     comp! {
         baz =>
         div {
             "baz_component"
-            @bar!();
+            call bar {}
         }
     }
     let html = baz!();
@@ -80,20 +80,20 @@ fn should_work_with_multiple_nested_components() {
 #[test]
 fn should_work_with_conditionals() {
     comp! {
-        foo =>
+        foo(foo) =>
         div {
-            if $bar == "bar"; {
+            if @foo; == "bar"; {
                 "bar_component"
-            } else if $baz == "baz"; {
+            } else if @foo; == "baz"; {
                 "baz_component"
             } else {
                 "foo_component"
             }
         }
     }
-    let html = foo!(bar { "bar" }, baz { "not_baz" });
-    let html2 = foo!(bar { "not_bar" }, baz { "baz" });
-    let html3 = foo!(bar { "not_bar" }, baz { "not_baz" });
+    let html = foo!(foo { "bar" });
+    let html2 = foo!(foo { "baz" });
+    let html3 = foo!(foo { "foo" });
     assert_eq!(html.0, "<div>bar_component</div>");
     assert_eq!(html2.0, "<div>baz_component</div>");
     assert_eq!(html3.0, "<div>foo_component</div>");
@@ -111,13 +111,13 @@ fn should_work_with_loops() {
         Points { x: 5, y: 6 },
     ];
     comp! {
-        foo =>
+        foo(points) =>
         div {
-            for point in $points; {
+            for point in @points;; {
                 div {
-                    *point.x.to_string().as_str();
+                    @point.x.to_string().as_str();
                     ","
-                    *point.y.to_string().as_str();
+                    @point.y.to_string().as_str();
                 }
             }
         }
@@ -132,9 +132,9 @@ fn should_work_with_loops() {
 #[test]
 fn should_work_with_match_expression() {
     comp! {
-        component =>
+        component(value) =>
         div {
-            match $value; {
+            match @value;; {
                 "bar" => {
                      "bar_component"
                 },
@@ -213,7 +213,7 @@ fn should_not_escape_expr() {
     comp! {
         component =>
         div {
-            *expr;!
+            @expr;!
         }
     }
     let html = component!();
@@ -245,7 +245,7 @@ fn should_not_escape_inner_comp() {
     comp! {
         foo =>
         div {
-            @bar!();!
+            call bar {}!
         }
     }
     let html = foo!();
@@ -362,7 +362,7 @@ fn should_move_script_when_minify_html_is_enabled() {
         foo =>
         div {
             "foo_component"
-            @bar!();
+            call bar {}
         }
         script_use bar_script;
     }
@@ -391,7 +391,7 @@ fn should_move_script_when_minify_html_is_not_enabled() {
         foo =>
         div {
             "foo_component"
-            @bar!();
+            call bar {}
         }
         script_use bar_script;
     }
