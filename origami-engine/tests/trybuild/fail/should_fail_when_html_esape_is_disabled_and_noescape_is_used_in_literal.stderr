@@ -1,8 +1,8 @@
 error: Invalid input for `Children`. Expected one of the following: `LitStr`, `if`, `@`, `self`/`..`, or `Ident`.
-  --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_noescape_is_used_in_literal.rs:7:28
+  --> tests/trybuild/fail/should_fail_when_html_esape_is_disabled_and_noescape_is_used_in_literal.rs:7:26
    |
-7  |             *"<div></div>";!
-   |                            ^
+7  |             "<div></div>";!
+   |                          ^
 ...
 10 |     foo!();
    |     ------ in this macro invocation

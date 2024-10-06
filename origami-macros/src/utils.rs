@@ -6,6 +6,7 @@ pub mod kw {
     custom_keyword!(escape);
     custom_keyword!(noescape);
     custom_keyword!(literals);
+    custom_keyword!(call);
 }
 
 macro_rules! bail {
@@ -25,7 +26,7 @@ macro_rules! combine_to_lit {
     (@internal span => $span:expr, $($input:expr),*) => {{
         let mut s = String::new();
         $(s.push_str(&$input);)*
-        LitStr::new(&s, $span)
+        ::syn::LitStr::new(&s, $span)
     }}
 }
 pub(crate) use combine_to_lit;

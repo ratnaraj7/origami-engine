@@ -1,8 +1,10 @@
 #[cfg(feature = "minify_html")]
 use minify_html::Cfg;
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::Parse;
-use syn::{braced, parse_quote, Expr, Ident, LitStr, Macro, Token};
+use syn::token::Return;
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Token};
 
 mod children;
 
@@ -20,7 +22,8 @@ use self::children::{
 pub struct Anon {
     expr: Expr,
     childrens: Childrens,
-    concat_args: Option<proc_macro2::TokenStream>,
+    concat_args: Option<TokenStream>,
+    concat_args_return_ident: Option<Ident>,
 }
 
 impl Parse for Anon {
@@ -31,6 +34,14 @@ impl Parse for Anon {
             braced!(content in input);
             input.parse::<Token![,]>()?;
             Some(content.parse()?)
+        } else {
+            None
+        };
+        let concat_args_return_ident = if input.peek(Return) {
+            input.parse::<Return>()?;
+            let ident = Some(input.parse()?);
+            input.parse::<Token![,]>()?;
+            ident
         } else {
             None
         };
@@ -67,15 +78,26 @@ impl Parse for Anon {
             expr,
             childrens,
             concat_args,
+            concat_args_return_ident,
         })
     }
 }
 
 impl ToTokens for Anon {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut concat_args = self.concat_args.clone().unwrap_or_default();
         childrens_to_tokens(tokens, &self.childrens, &self.expr, &mut concat_args, false);
-        concat_args_to_concat(tokens, &mut concat_args, &self.expr);
+        if let Some(ident) = &self.concat_args_return_ident {
+            tokens.extend(quote! {
+                macro_rules! #ident {
+                    () => {
+                        concat!(#concat_args)
+                    }
+                }
+            });
+        } else {
+            concat_args_to_concat(tokens, &mut concat_args, &self.expr);
+        }
     }
 }
 
@@ -94,11 +116,7 @@ enum ProcessType {
     None,
 }
 
-fn extend_concat_args(
-    concat_args: &mut proc_macro2::TokenStream,
-    literal: &LitStr,
-    pt: ProcessType,
-) {
+fn extend_concat_args(concat_args: &mut TokenStream, literal: &LitStr, pt: ProcessType) {
     let literal = match pt {
         #[cfg(feature = "minify_html")]
         ProcessType::Minify(Minify::Script) => {
@@ -133,22 +151,18 @@ fn extend_concat_args(
     })
 }
 
-fn concat_args_to_concat(
-    ts: &mut proc_macro2::TokenStream,
-    concat_args: &mut proc_macro2::TokenStream,
-    s: &Expr,
-) {
+fn concat_args_to_concat(ts: &mut TokenStream, concat_args: &mut TokenStream, s: &Expr) {
     if !concat_args.is_empty() {
         ts.extend(quote! {
             #s.push_str(concat!(#concat_args));
         });
-        *concat_args = proc_macro2::TokenStream::new();
+        *concat_args = TokenStream::new();
     }
 }
 
 fn extend_text(
     text: &LitStr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     #[cfg(feature = "html_escape")] escape: bool,
 ) {
     #[allow(unused)]
@@ -162,10 +176,10 @@ fn extend_text(
 }
 
 fn expr_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     expr: &Expr,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     #[cfg(feature = "html_escape")] escape: bool,
 ) {
     concat_args_to_concat(ts, concat_args, s);
@@ -181,12 +195,12 @@ fn expr_to_tokens(
 }
 
 fn conditonal_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     (if_expr, if_childrens): &(Expr, Childrens),
     else_ifs: &Vec<(Expr, Childrens)>,
     else_: &Childrens,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
 ) {
     concat_args_to_concat(ts, concat_args, s);
     ts.extend(quote! {
@@ -206,45 +220,45 @@ fn conditonal_to_tokens(
 }
 
 fn comp_call_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
-    comp: &Macro,
+    ts: &mut TokenStream,
+    comp: &Ident,
+    comp_ts: &TokenStream,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     #[cfg(feature = "html_escape")] escape: bool,
 ) {
-    let mut comp = comp.clone();
-    comp.tokens = {
-        #[allow(unused)]
-        let mut escape_t = quote! {};
-        #[cfg(feature = "html_escape")]
-        if escape {
-            escape_t = quote! {};
-        } else {
-            escape_t = quote! {noescape, };
-        }
-        let ts = comp.tokens;
-        quote! {
+    #[allow(unused)]
+    let mut escape_ts = quote! {};
+    #[cfg(feature = "html_escape")]
+    if escape {
+        escape_ts = quote! {};
+    } else {
+        escape_ts = quote! {noescape, };
+    }
+    let return_ident = Ident::new(format!("{}_return", comp,).as_str(), comp.span());
+    ts.extend(quote! {
+        #comp! {
             literals {
                 #concat_args
             },
-            #escape_t
+            return #return_ident,
+            #escape_ts
             #s =>
-            #ts
+            #comp_ts
         }
+    });
+    *concat_args = quote! {
+        #return_ident!(),
     };
-    *concat_args = proc_macro2::TokenStream::new();
-    ts.extend(quote! {
-        #comp;
-    })
 }
 
 fn loop_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     expr_b: &Expr,
     expr_a: &Expr,
     childrens: &Childrens,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
 ) {
     concat_args_to_concat(ts, concat_args, s);
     ts.extend(quote! {
@@ -254,12 +268,12 @@ fn loop_to_tokens(
 }
 
 fn html_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     tag: &Ident,
     attrs: &Attributes,
     childrens: &HtmlChildrens,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
 ) {
     let tag_span = tag.span();
     let tag = tag.to_string();
@@ -286,14 +300,14 @@ fn html_to_tokens(
 }
 
 fn match_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     expr: &Expr,
     arms: &[CustomMatchArm],
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
 ) {
     concat_args_to_concat(ts, concat_args, s);
-    let mut temp = proc_macro2::TokenStream::new();
+    let mut temp = TokenStream::new();
     for CustomMatchArm {
         body,
         pat,
@@ -325,10 +339,10 @@ fn match_to_tokens(
 }
 
 fn style_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     ty: &ScriptOrStyleContent,
     attrs: &Attributes,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     s: &Expr,
     #[cfg(feature = "minify_html")] minify: bool,
 ) {
@@ -347,17 +361,17 @@ fn style_to_tokens(
 }
 
 fn script_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     name: &Option<LitStr>,
     ty: &ScriptOrStyleContent,
     attrs: &Attributes,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     s: &Expr,
     #[cfg(feature = "minify_html")] minify: bool,
 ) {
     if let Some(name) = name {
-        let mut temp = proc_macro2::TokenStream::new();
-        let mut temp_concat_args = proc_macro2::TokenStream::new();
+        let mut temp = TokenStream::new();
+        let mut temp_concat_args = TokenStream::new();
         extend_concat_args(
             &mut temp_concat_args,
             &combine_to_lit!("<script"),
@@ -412,9 +426,9 @@ fn script_to_tokens(
 }
 
 fn script_or_style_content_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     ty: &ScriptOrStyleContent,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     s: &Expr,
     #[cfg(feature = "minify_html")] minify: Minify,
 ) {
@@ -457,10 +471,10 @@ fn script_or_style_content_to_tokens(
 }
 
 fn attribute_to_token(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     attributes: &Attributes,
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
 ) {
     for (k, v) in &attributes.0 {
         match k {
@@ -513,14 +527,14 @@ fn attribute_to_token(
 }
 
 fn childrens_to_tokens(
-    ts: &mut proc_macro2::TokenStream,
+    ts: &mut TokenStream,
     childrens: &[Children],
     s: &Expr,
-    concat_args: &mut proc_macro2::TokenStream,
+    concat_args: &mut TokenStream,
     with_brace: bool,
 ) {
     if with_brace {
-        let mut temp_ts = proc_macro2::TokenStream::new();
+        let mut temp_ts = TokenStream::new();
         childrens_to_tokens(&mut temp_ts, childrens, s, concat_args, false);
         concat_args_to_concat(&mut temp_ts, concat_args, s);
         ts.extend(quote! {
@@ -555,11 +569,13 @@ fn childrens_to_tokens(
                 ),
                 Children::CompCall {
                     comp,
+                    ts: comp_ts,
                     #[cfg(feature = "html_escape")]
                     escape,
                 } => comp_call_to_tokens(
                     ts,
                     comp,
+                    comp_ts,
                     s,
                     concat_args,
                     #[cfg(feature = "html_escape")]
