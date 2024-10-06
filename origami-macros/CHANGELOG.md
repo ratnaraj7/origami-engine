@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.4...origami-macros-v0.1.0-alpha.5) - 2024-10-06
+
+### Added
+
+- [**breaking**] Use `Ident` for component calls and update `anon` to return `concat_args`
+
 ## [0.1.0-alpha.4](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.3...origami-macros-v0.1.0-alpha.4) - 2024-10-02
 
 ### Other
