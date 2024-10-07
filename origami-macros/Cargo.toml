@@ -11,11 +11,12 @@ proc-macro = true
 
 [dependencies]
 indexmap = "2.4.0"
-proc-macro2 =  "1.0.86"
+proc-macro2 = "1.0.86"
 quote = "1.0.36"
 syn = { version = "2.0.72", features = ["extra-traits", "full"] }
 html-escape = { version = "0.2.13", optional = true }
 minify-html = { version = "0.15.0", optional = true }
+rand = "0.8.5"
 
 [features]
 default = ["html_escape", "minify_html"]

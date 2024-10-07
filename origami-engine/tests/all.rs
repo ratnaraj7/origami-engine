@@ -61,6 +61,7 @@ fn should_work_with_multiple_nested_components() {
         div {
             "bar_component"
             call foo {}
+            call foo {}
         }
     }
     comp! {
@@ -73,7 +74,7 @@ fn should_work_with_multiple_nested_components() {
     let html = baz!();
     assert_eq!(
         html.0,
-        "<div>baz_component<div>bar_component<div>foo_component</div></div></div>"
+        "<div>baz_component<div>bar_component<div>foo_component</div><div>foo_component</div></div></div>"
     );
 }
 
@@ -351,7 +352,7 @@ fn should_move_script_when_minify_html_is_enabled() {
         bar =>
         div {
             "bar_component"
-            script script_name="bar_script" {
+            script bubble_up {
                 r#"function foo() {
                     return "hello world";
                 }"#
@@ -364,7 +365,6 @@ fn should_move_script_when_minify_html_is_enabled() {
             "foo_component"
             call bar {}
         }
-        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(
@@ -380,7 +380,7 @@ fn should_move_script_when_minify_html_is_not_enabled() {
         bar =>
         div {
             "bar_component"
-            script script_name="bar_script" {
+            script bubble_up {
                 r#"function foo() {
                     return "hello world";
                 }"#
@@ -393,7 +393,6 @@ fn should_move_script_when_minify_html_is_not_enabled() {
             "foo_component"
             call bar {}
         }
-        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(

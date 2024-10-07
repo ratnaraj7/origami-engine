@@ -228,21 +228,20 @@
 //! }
 //! ```
 //!
-//! ## Moveable Scripts
+//! ## Bubble up scripts
 //!
-//! To create moveable scripts, assign a unique name to the script. You can then use this name below the component call.
+//! Bubble up the scripts to the top most component using `bubble_up` attribute.
 //!
 //! ## Example
 //!
 //! ```rust
 //! use origami_engine::comp;
 //!
-//! // Define a component that includes a moveable script named "bar_script"
 //! comp! {
 //!     bar =>
 //!     div {
 //!         "bar_component"
-//!         script script_name="bar_script" {
+//!         script bubble_up {
 //!             r#"function foo() {
 //!                 return "hello world";
 //!             }"#
@@ -250,20 +249,25 @@
 //!     }
 //! }
 //!
-//! // Define another component that uses the previously defined component
 //! comp! {
 //!     foo =>
 //!     div {
 //!         "foo_component"
 //!         call bar {} // Include the bar component
 //!     }
-//!     // Use the moveable script below the component call
-//!     script_use bar_script; // Include the script with the specified name
 //! }
 //!
 //! let html = foo!();
 //!
-//! #[cfg(feature = "minify_html")] // `minify_html` is required to minify the script
+//! #[cfg(not(feature = "minify_html"))]
+//! assert_eq!(
+//!     html.0,
+//!     r#"<div>foo_component<div>bar_component</div></div><script>function foo() {
+//!                 return "hello world";
+//!             }</script>"#
+//! );
+//!
+//! #[cfg(feature = "minify_html")]
 //! assert_eq!(
 //!     html.0,
 //!     "<div>foo_component<div>bar_component</div></div><script>function foo() { return \"hello world\"; }</script>"
