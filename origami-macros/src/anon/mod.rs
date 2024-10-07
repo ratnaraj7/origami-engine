@@ -2,6 +2,7 @@
 use minify_html::Cfg;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
+use rand::prelude::*;
 use syn::parse::Parse;
 use syn::token::Return;
 use syn::{braced, parse_quote, Expr, Ident, LitStr, Token};
@@ -235,7 +236,12 @@ fn comp_call_to_tokens(
     } else {
         escape_ts = quote! {noescape, };
     }
-    let return_ident = Ident::new(format!("{}_return", comp,).as_str(), comp.span());
+    let mut rng = rand::thread_rng();
+    let random_number: u64 = rng.gen();
+    let return_ident = Ident::new(
+        format!("{}_return_{}", comp, random_number).as_str(),
+        comp.span(),
+    );
     ts.extend(quote! {
         #comp! {
             literals {
