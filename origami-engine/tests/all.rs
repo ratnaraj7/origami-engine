@@ -352,7 +352,7 @@ fn should_move_script_when_minify_html_is_enabled() {
         bar =>
         div {
             "bar_component"
-            script script_name="bar_script" {
+            script bubble_up {
                 r#"function foo() {
                     return "hello world";
                 }"#
@@ -365,7 +365,6 @@ fn should_move_script_when_minify_html_is_enabled() {
             "foo_component"
             call bar {}
         }
-        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(
@@ -381,7 +380,7 @@ fn should_move_script_when_minify_html_is_not_enabled() {
         bar =>
         div {
             "bar_component"
-            script script_name="bar_script" {
+            script bubble_up {
                 r#"function foo() {
                     return "hello world";
                 }"#
@@ -394,7 +393,6 @@ fn should_move_script_when_minify_html_is_not_enabled() {
             "foo_component"
             call bar {}
         }
-        script_use bar_script;
     }
     let html = foo!();
     assert_eq!(
