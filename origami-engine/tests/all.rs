@@ -61,6 +61,7 @@ fn should_work_with_multiple_nested_components() {
         div {
             "bar_component"
             call foo {}
+            call foo {}
         }
     }
     comp! {
@@ -73,7 +74,7 @@ fn should_work_with_multiple_nested_components() {
     let html = baz!();
     assert_eq!(
         html.0,
-        "<div>baz_component<div>bar_component<div>foo_component</div></div></div>"
+        "<div>baz_component<div>bar_component<div>foo_component</div><div>foo_component</div></div></div>"
     );
 }
 
