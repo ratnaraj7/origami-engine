@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3-alpha.4](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.3-alpha.3...origami-engine-v0.1.3-alpha.4) - 2024-10-07
+
+### Other
+
+- Update docs
+- tests
+- tests
+
 ## [0.1.3-alpha.3](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.3-alpha.2...origami-engine-v0.1.3-alpha.3) - 2024-10-06
 
 ### Other
