@@ -2,6 +2,8 @@
 
 ### High Priority
 
+- [ ] Improve code quality
+- [ ] Use structs for generating tokens in anon module
 - [x] Refactor the code to improve logic, optimize performance, and enhance maintainability, as the initial implementation was focused on just making it work.
 - [x] Update attributes handling logic
 - [x] Implement pattern matching
@@ -10,7 +12,6 @@
 - [ ] ~~Consolidate attributes when iterating~~
 - [x] For literals escape or minify at compile time
 - [x] pass concat args while calling components
-- [ ] Improve code quality
 
 ### Medium Priority
 
@@ -27,8 +28,8 @@
 
 ### Ideas
 
-- [ ] Returning concat args if possible
-- [ ] While `script_use` check if it is a literal, so that it can be use as a concat arg
+- [x] Returning concat args if possible
+- [ ] ~While `script_use` check if it is a literal, so that it can be use as a concat arg~
 - [ ] Expressions with attributes
 - [ ] Access modifiers for generated component macros
 - [ ] ~~Macro calling another macro for blocks, consolidation, etc.~~
