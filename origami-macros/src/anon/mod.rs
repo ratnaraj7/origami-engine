@@ -1,7 +1,7 @@
 #[cfg(feature = "minify_html")]
 use minify_html::Cfg;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, ToTokens};
 use rand::prelude::*;
 use syn::parse::Parse;
 use syn::token::Return;
@@ -11,7 +11,7 @@ mod children;
 
 use crate::anon::children::CustomMatchArm;
 use crate::utils::combine_to_lit;
-use crate::utils::kw::literals;
+use crate::utils::kw::{bubble_up_ident, literals};
 #[cfg(feature = "html_escape")]
 use crate::utils::kw::{escape, noescape};
 
@@ -25,6 +25,7 @@ pub struct Anon {
     childrens: Childrens,
     concat_args: Option<TokenStream>,
     concat_args_return_ident: Option<Ident>,
+    bubble_up_ident: Option<Ident>,
 }
 
 impl Parse for Anon {
@@ -40,6 +41,14 @@ impl Parse for Anon {
         };
         let concat_args_return_ident = if input.peek(Return) {
             input.parse::<Return>()?;
+            let ident = Some(input.parse()?);
+            input.parse::<Token![,]>()?;
+            ident
+        } else {
+            None
+        };
+        let bubble_up_ident = if input.peek(bubble_up_ident) {
+            input.parse::<bubble_up_ident>()?;
             let ident = Some(input.parse()?);
             input.parse::<Token![,]>()?;
             ident
@@ -80,14 +89,29 @@ impl Parse for Anon {
             childrens,
             concat_args,
             concat_args_return_ident,
+            bubble_up_ident,
         })
     }
 }
 
 impl ToTokens for Anon {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut bubble_up_script_calls = TokenStream::new();
+        let mut bubble_up_ts = if self.bubble_up_ident.is_some() {
+            Some(TokenStream::new())
+        } else {
+            None
+        };
         let mut concat_args = self.concat_args.clone().unwrap_or_default();
-        childrens_to_tokens(tokens, &self.childrens, &self.expr, &mut concat_args, false);
+        childrens_to_tokens(
+            tokens,
+            &mut bubble_up_ts,
+            &mut bubble_up_script_calls,
+            &self.childrens,
+            &self.expr,
+            &mut concat_args,
+            false,
+        );
         if let Some(ident) = &self.concat_args_return_ident {
             tokens.extend(quote! {
                 macro_rules! #ident {
@@ -98,6 +122,18 @@ impl ToTokens for Anon {
             });
         } else {
             concat_args_to_concat(tokens, &mut concat_args, &self.expr);
+        }
+        if let Some(ident) = &self.bubble_up_ident {
+            tokens.extend(quote! {
+                macro_rules! #ident {
+                    () => {
+                        #bubble_up_script_calls
+                        #bubble_up_ts
+                    }
+                }
+            });
+        } else {
+            tokens.extend(bubble_up_script_calls);
         }
     }
 }
@@ -197,6 +233,8 @@ fn expr_to_tokens(
 
 fn conditonal_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_ts: &mut Option<TokenStream>,
+    bubble_up_script_calls: &mut TokenStream,
     (if_expr, if_childrens): &(Expr, Childrens),
     else_ifs: &Vec<(Expr, Childrens)>,
     else_: &Childrens,
@@ -207,21 +245,46 @@ fn conditonal_to_tokens(
     ts.extend(quote! {
         if #if_expr
     });
-    childrens_to_tokens(ts, if_childrens, s, concat_args, true);
+    childrens_to_tokens(
+        ts,
+        bubble_up_ts,
+        bubble_up_script_calls,
+        if_childrens,
+        s,
+        concat_args,
+        true,
+    );
     for (else_if_expr, else_if_childrens) in else_ifs {
         ts.extend(quote! {
             else if #else_if_expr
         });
-        childrens_to_tokens(ts, else_if_childrens, s, concat_args, true);
+        childrens_to_tokens(
+            ts,
+            bubble_up_ts,
+            bubble_up_script_calls,
+            else_if_childrens,
+            s,
+            concat_args,
+            true,
+        );
     }
     ts.extend(quote! {
         else
     });
-    childrens_to_tokens(ts, else_, s, concat_args, true);
+    childrens_to_tokens(
+        ts,
+        bubble_up_ts,
+        bubble_up_script_calls,
+        else_,
+        s,
+        concat_args,
+        true,
+    );
 }
 
 fn comp_call_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_script_calls: &mut TokenStream,
     comp: &Ident,
     comp_ts: &TokenStream,
     s: &Expr,
@@ -242,16 +305,24 @@ fn comp_call_to_tokens(
         format!("{}_return_{}", comp, random_number).as_str(),
         comp.span(),
     );
+    let bubble_up_script_call_ident = Ident::new(
+        format!("{}_script_{}", comp, random_number).as_str(),
+        comp.span(),
+    );
     ts.extend(quote! {
         #comp! {
             literals {
                 #concat_args
             },
             return #return_ident,
+            bubble_up_ident #bubble_up_script_call_ident,
             #escape_ts
             #s =>
             #comp_ts
         }
+    });
+    bubble_up_script_calls.extend(quote! {
+        #bubble_up_script_call_ident!();
     });
     *concat_args = quote! {
         #return_ident!(),
@@ -260,6 +331,8 @@ fn comp_call_to_tokens(
 
 fn loop_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_ts: &mut Option<TokenStream>,
+    bubble_up_script_calls: &mut TokenStream,
     expr_b: &Expr,
     expr_a: &Expr,
     childrens: &Childrens,
@@ -270,11 +343,21 @@ fn loop_to_tokens(
     ts.extend(quote! {
         for #expr_b in #expr_a
     });
-    childrens_to_tokens(ts, childrens, s, concat_args, true);
+    childrens_to_tokens(
+        ts,
+        bubble_up_ts,
+        bubble_up_script_calls,
+        childrens,
+        s,
+        concat_args,
+        true,
+    );
 }
 
 fn html_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_ts: &mut Option<TokenStream>,
+    bubble_up_script_calls: &mut TokenStream,
     tag: &Ident,
     attrs: &Attributes,
     childrens: &HtmlChildrens,
@@ -292,7 +375,15 @@ fn html_to_tokens(
     match childrens {
         HtmlChildrens::Childrens(childrens) => {
             extend_concat_args(concat_args, &combine_to_lit!(">"), ProcessType::None);
-            childrens_to_tokens(ts, childrens, s, concat_args, false);
+            childrens_to_tokens(
+                ts,
+                bubble_up_ts,
+                bubble_up_script_calls,
+                childrens,
+                s,
+                concat_args,
+                false,
+            );
             extend_concat_args(
                 concat_args,
                 &combine_to_lit!(tag_span => "</", tag, ">"),
@@ -307,6 +398,8 @@ fn html_to_tokens(
 
 fn match_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_ts: &mut Option<TokenStream>,
+    bubble_up_script_calls: &mut TokenStream,
     expr: &Expr,
     arms: &[CustomMatchArm],
     s: &Expr,
@@ -331,7 +424,15 @@ fn match_to_tokens(
         temp.extend(quote! {
             #pat #guard =>
         });
-        childrens_to_tokens(&mut temp, body, s, concat_args, true);
+        childrens_to_tokens(
+            &mut temp,
+            bubble_up_ts,
+            bubble_up_script_calls,
+            body,
+            s,
+            concat_args,
+            true,
+        );
         concat_args_to_concat(&mut temp, concat_args, s);
         temp.extend(quote! {
             #comma
@@ -368,29 +469,29 @@ fn style_to_tokens(
 
 fn script_to_tokens(
     ts: &mut TokenStream,
-    name: &Option<LitStr>,
+    bubble_up: bool,
+    bubble_up_ts: &mut Option<TokenStream>,
     ty: &ScriptOrStyleContent,
     attrs: &Attributes,
     concat_args: &mut TokenStream,
     s: &Expr,
     #[cfg(feature = "minify_html")] minify: bool,
 ) {
-    if let Some(name) = name {
-        let mut temp = TokenStream::new();
+    if let (Some(b_ts), true) = (bubble_up_ts.as_mut(), bubble_up) {
         let mut temp_concat_args = TokenStream::new();
         extend_concat_args(
             &mut temp_concat_args,
             &combine_to_lit!("<script"),
             ProcessType::None,
         );
-        attribute_to_token(&mut temp, attrs, s, concat_args);
+        attribute_to_token(b_ts, attrs, s, concat_args);
         extend_concat_args(
             &mut temp_concat_args,
             &combine_to_lit!(">"),
             ProcessType::None,
         );
         script_or_style_content_to_tokens(
-            &mut temp,
+            b_ts,
             ty,
             &mut temp_concat_args,
             s,
@@ -402,15 +503,7 @@ fn script_to_tokens(
             &combine_to_lit!("</script>"),
             ProcessType::None,
         );
-        concat_args_to_concat(&mut temp, &mut temp_concat_args, s);
-        let name = Ident::new(name.value().as_str(), name.span());
-        ts.extend(quote! {
-            macro_rules! #name {
-                (javascript) => {
-                    #temp
-                }
-            }
-        });
+        concat_args_to_concat(b_ts, &mut temp_concat_args, s);
     } else {
         extend_concat_args(concat_args, &combine_to_lit!("<script"), ProcessType::None);
         attribute_to_token(ts, attrs, s, concat_args);
@@ -484,7 +577,7 @@ fn attribute_to_token(
 ) {
     for (k, v) in &attributes.0 {
         match k {
-            AttributeKey::Ident(ident) if ident == "script_name" => {
+            AttributeKey::Ident(ident) if ident == "bubble_up" => {
                 continue;
             }
             AttributeKey::Ident(ident) => {
@@ -534,6 +627,8 @@ fn attribute_to_token(
 
 fn childrens_to_tokens(
     ts: &mut TokenStream,
+    bubble_up_ts: &mut Option<TokenStream>,
+    bubble_up_script_calls: &mut TokenStream,
     childrens: &[Children],
     s: &Expr,
     concat_args: &mut TokenStream,
@@ -541,7 +636,15 @@ fn childrens_to_tokens(
 ) {
     if with_brace {
         let mut temp_ts = TokenStream::new();
-        childrens_to_tokens(&mut temp_ts, childrens, s, concat_args, false);
+        childrens_to_tokens(
+            &mut temp_ts,
+            bubble_up_ts,
+            bubble_up_script_calls,
+            childrens,
+            s,
+            concat_args,
+            false,
+        );
         concat_args_to_concat(&mut temp_ts, concat_args, s);
         ts.extend(quote! {
             {
@@ -580,6 +683,7 @@ fn childrens_to_tokens(
                     escape,
                 } => comp_call_to_tokens(
                     ts,
+                    bubble_up_script_calls,
                     comp,
                     comp_ts,
                     s,
@@ -591,18 +695,53 @@ fn childrens_to_tokens(
                     if_,
                     else_ifs,
                     else_,
-                } => conditonal_to_tokens(ts, if_, else_ifs, else_, s, concat_args),
+                } => conditonal_to_tokens(
+                    ts,
+                    bubble_up_ts,
+                    bubble_up_script_calls,
+                    if_,
+                    else_ifs,
+                    else_,
+                    s,
+                    concat_args,
+                ),
                 Children::For {
                     expr_b,
                     expr_a,
                     childrens,
-                } => loop_to_tokens(ts, expr_b, expr_a, childrens, s, concat_args),
+                } => loop_to_tokens(
+                    ts,
+                    bubble_up_ts,
+                    bubble_up_script_calls,
+                    expr_b,
+                    expr_a,
+                    childrens,
+                    s,
+                    concat_args,
+                ),
                 Children::Html {
                     tag,
                     attrs,
                     childrens,
-                } => html_to_tokens(ts, tag, attrs, childrens, s, concat_args),
-                Children::Match { expr, arms } => match_to_tokens(ts, expr, arms, s, concat_args),
+                } => html_to_tokens(
+                    ts,
+                    bubble_up_ts,
+                    bubble_up_script_calls,
+                    tag,
+                    attrs,
+                    childrens,
+                    s,
+                    concat_args,
+                ),
+                Children::Match { expr, arms } => match_to_tokens(
+                    ts,
+                    bubble_up_ts,
+                    bubble_up_script_calls,
+                    expr,
+                    arms,
+                    s,
+                    concat_args,
+                ),
                 Children::Style {
                     ty,
                     attrs,
@@ -618,14 +757,15 @@ fn childrens_to_tokens(
                     *minify,
                 ),
                 Children::Script {
-                    name,
+                    bubble_up,
                     ty,
                     attrs,
                     #[cfg(feature = "minify_html")]
                     minify,
                 } => script_to_tokens(
                     ts,
-                    name,
+                    *bubble_up,
+                    bubble_up_ts,
                     ty,
                     attrs,
                     concat_args,
@@ -633,13 +773,6 @@ fn childrens_to_tokens(
                     #[cfg(feature = "minify_html")]
                     *minify,
                 ),
-                Children::ScriptUse { ident } => {
-                    concat_args_to_concat(ts, concat_args, s);
-                    ts.extend(quote_spanned! {
-                        ident.span() =>
-                        #ident!(javascript);
-                    })
-                }
             }
         }
     }

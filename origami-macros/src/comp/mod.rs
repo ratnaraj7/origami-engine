@@ -90,18 +90,20 @@ impl ToTokens for Component {
                   }
                   ::origami_engine::Origami(s)
               }};
-              (literals { $($concat_args:tt)* }, return $return_ident:ident, $s:expr => #back_comma_props) => {
+              (literals { $($concat_args:tt)* }, return $return_ident:ident, bubble_up_ident $bubble_up_ident:ident, $s:expr => #back_comma_props) => {
                   ::origami_engine::anon! {
                       literals { $($concat_args)* },
                       return $return_ident,
+                      bubble_up_ident $bubble_up_ident,
                       $s,
                       #ts
                   }
               };
-              (literals { $($concat_args:tt)* }, return $return_ident:ident, noescape, $s:expr => #back_comma_props) => {
+              (literals { $($concat_args:tt)* }, return $return_ident:ident, bubble_up_ident $bubble_up_ident:ident, noescape, $s:expr => #back_comma_props) => {
                   ::origami_engine::anon! {
                       literals { $($concat_args)* },
                       return $return_ident,
+                      bubble_up_ident $bubble_up_ident,
                       noescape,
                       $s,
                       #ts

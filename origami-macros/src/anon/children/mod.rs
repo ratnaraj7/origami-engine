@@ -6,9 +6,8 @@ use syn::spanned::Spanned;
 use syn::token::{Comma, If};
 use syn::{braced, parse_quote, Expr, Ident, LitStr, Pat, Token};
 
-use crate::anon::children::attributes::AttributeValue;
 use crate::utils::bail;
-use crate::utils::kw::{call, script_use};
+use crate::utils::kw::call;
 #[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
 
@@ -97,9 +96,9 @@ pub(super) enum Children {
         arms: Vec<CustomMatchArm>,
     },
     Script {
-        name: Option<LitStr>,
         ty: ScriptOrStyleContent,
         attrs: Attributes,
+        bubble_up: bool,
         #[cfg(feature = "minify_html")]
         minify: bool,
     },
@@ -108,9 +107,6 @@ pub(super) enum Children {
         attrs: Attributes,
         #[cfg(feature = "minify_html")]
         minify: bool,
-    },
-    ScriptUse {
-        ident: Ident,
     },
 }
 
@@ -157,12 +153,6 @@ impl Children {
         }
         if input.peek(Token![match]) {
             return parse_match(input, pc);
-        }
-        if input.peek(script_use) {
-            input.parse::<script_use>()?;
-            let ident: Ident = input.parse()?;
-            input.parse::<Token![;]>()?;
-            return Ok(Children::ScriptUse { ident });
         }
         if input.peek(Ident) {
             return parse_html(input, pc);
@@ -276,19 +266,18 @@ fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
         #[cfg(feature = "minify_html")]
         let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
         if tag == "script" {
-            let name = if let Some(attr_val) =
-                attrs.0.get(&AttributeKey::Ident(parse_quote!(script_name)))
+            let bubble_up = if let Some(attr_val) =
+                attrs.0.get(&AttributeKey::Ident(parse_quote!(bubble_up)))
             {
-                if let Some(AttributeValue::LitStr(name)) = attr_val {
-                    Some(name.clone())
-                } else {
-                    bail!(input, "`script_name` must be a string literal");
+                if attr_val.is_some() {
+                    bail!(input, "bubble_up should not have a value");
                 }
+                true
             } else {
-                None
+                false
             };
             return Ok(Children::Script {
-                name,
+                bubble_up,
                 ty,
                 attrs,
                 #[cfg(feature = "minify_html")]

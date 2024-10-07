@@ -1,11 +1,11 @@
 pub mod kw {
     use syn::custom_keyword;
     custom_keyword!(nominify);
-    custom_keyword!(script_use);
     custom_keyword!(size_hint);
     custom_keyword!(escape);
     custom_keyword!(noescape);
     custom_keyword!(literals);
+    custom_keyword!(bubble_up_ident);
     custom_keyword!(call);
 }
 
