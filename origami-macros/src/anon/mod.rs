@@ -4,16 +4,15 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 use rand::prelude::*;
 use syn::parse::Parse;
-use syn::token::Return;
 use syn::{braced, parse_quote, Expr, Ident, LitStr, Token};
 
 mod children;
 
 use crate::anon::children::CustomMatchArm;
-use crate::utils::combine_to_lit;
-use crate::utils::kw::{bubble_up_ident, literals};
+use crate::utils::kw::{bubble_up_ident, childrens, concat_args, concat_args_ident, string};
 #[cfg(feature = "html_escape")]
 use crate::utils::kw::{escape, noescape};
+use crate::utils::{bail, combine_to_lit};
 
 use self::children::attributes::AttributeValue;
 use self::children::{
@@ -30,67 +29,84 @@ pub struct Anon {
 
 impl Parse for Anon {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let concat_args = if input.peek(literals) {
-            input.parse::<literals>()?;
-            let content;
-            braced!(content in input);
-            input.parse::<Token![,]>()?;
-            Some(content.parse()?)
-        } else {
-            None
+        let mut anon = Self {
+            concat_args_return_ident: None,
+            concat_args: None,
+            bubble_up_ident: None,
+            childrens: Vec::new(),
+            expr: parse_quote!(s),
         };
-        let concat_args_return_ident = if input.peek(Return) {
-            input.parse::<Return>()?;
-            let ident = Some(input.parse()?);
-            input.parse::<Token![,]>()?;
-            ident
-        } else {
-            None
-        };
-        let bubble_up_ident = if input.peek(bubble_up_ident) {
-            input.parse::<bubble_up_ident>()?;
-            let ident = Some(input.parse()?);
-            input.parse::<Token![,]>()?;
-            ident
-        } else {
-            None
-        };
-        #[cfg(feature = "html_escape")]
-        let escape = if input.peek(escape) {
-            input.parse::<escape>()?;
-            input.parse::<Token![,]>()?;
-            true
-        } else if input.peek(noescape) {
-            input.parse::<noescape>()?;
-            input.parse::<Token![,]>()?;
-            false
-        } else {
-            true
-        };
-        let expr = if input.peek2(Token![,]) {
-            let expr = input.parse::<Expr>()?;
-            input.parse::<Token![,]>()?;
-            expr
-        } else {
-            parse_quote! {
-                s
-            }
-        };
-        let mut childrens = Vec::new();
-        let mut ctx = Context {
-            #[cfg(feature = "html_escape")]
-            escape,
-        };
+        let mut count = 0;
         while !input.is_empty() {
-            childrens.push(Children::parse(input, &mut ctx)?);
+            if count > 0 {
+                input.parse::<Token![,]>()?;
+                if input.is_empty() {
+                    break;
+                }
+            }
+            if input.peek(concat_args_ident) {
+                if anon.concat_args_return_ident.is_some() {
+                    bail!(input, "duplicate `concat_args_ident`");
+                }
+                input.parse::<concat_args_ident>()?;
+                anon.concat_args_return_ident = Some(input.parse()?);
+                count += 1;
+                continue;
+            }
+            if input.peek(concat_args) {
+                if anon.concat_args.is_some() {
+                    bail!(input, "duplicate `concat_args`");
+                }
+                input.parse::<concat_args>()?;
+                let content;
+                braced!(content in input);
+                anon.concat_args = Some(content.parse()?);
+                count += 1;
+                continue;
+            }
+            if input.peek(bubble_up_ident) {
+                if anon.bubble_up_ident.is_some() {
+                    bail!(input, "duplicate `bubble_up_ident`");
+                }
+                input.parse::<bubble_up_ident>()?;
+                anon.bubble_up_ident = Some(input.parse()?);
+                count += 1;
+                continue;
+            }
+            if input.peek(string) {
+                input.parse::<string>()?;
+                anon.expr = input.parse()?;
+                count += 1;
+                continue;
+            }
+            if input.peek(childrens) {
+                if !anon.childrens.is_empty() {
+                    bail!(input, "duplicate `childrens`");
+                }
+                input.parse::<childrens>()?;
+                let mut ctx = Context {
+                    #[cfg(feature = "html_escape")]
+                    escape: if input.peek(escape) {
+                        input.parse::<escape>()?;
+                        true
+                    } else if input.peek(noescape) {
+                        input.parse::<noescape>()?;
+                        false
+                    } else {
+                        true
+                    },
+                };
+                let content;
+                braced!(content in input);
+                while !content.is_empty() {
+                    anon.childrens.push(Children::parse(&content, &mut ctx)?);
+                }
+                count += 1;
+                continue;
+            }
+            bail!(input, "unexpected token");
         }
-        Ok(Anon {
-            expr,
-            childrens,
-            concat_args,
-            concat_args_return_ident,
-            bubble_up_ident,
-        })
+        Ok(anon)
     }
 }
 
@@ -341,17 +357,17 @@ impl Extend<'_> {
         let mut escape_ts = quote! {};
         #[cfg(feature = "html_escape")]
         if escape {
-            escape_ts = quote! {};
+            escape_ts = quote! { escape };
         } else {
-            escape_ts = quote! {noescape, };
+            escape_ts = quote! { noescape };
         }
         let mut rng = rand::thread_rng();
         let random_number: u64 = rng.gen();
-        let return_ident = Ident::new(
+        let concat_args_ident = Ident::new(
             format!("{}_return_{}", comp, random_number).as_str(),
             comp.span(),
         );
-        let bubble_up_script_call_ident = Ident::new(
+        let bubble_up_ident = Ident::new(
             format!("{}_script_{}", comp, random_number).as_str(),
             comp.span(),
         );
@@ -359,21 +375,24 @@ impl Extend<'_> {
         let s = self.s;
         self.ts.extend(quote! {
             #comp! {
-                literals {
-                    #concat_args
+                @component
+                escape { #escape_ts },
+                internal {
+                    concat_args {
+                        #concat_args
+                    },
+                    concat_args_ident #concat_args_ident,
+                    bubble_up_ident #bubble_up_ident,
+                    string #s
                 },
-                return #return_ident,
-                bubble_up_ident #bubble_up_script_call_ident,
-                #escape_ts
-                #s =>
                 #comp_ts
             }
         });
         self.bubble_up_script_calls.extend(quote! {
-            #bubble_up_script_call_ident!();
+            #bubble_up_ident!();
         });
         **concat_args = quote! {
-            #return_ident!(),
+            #concat_args_ident!(),
         };
     }
 
