@@ -60,55 +60,32 @@ impl ToTokens for Component {
         let ts = &self.ts;
         tokens.extend(quote! {
             macro_rules! #name {
+              (@component escape { $($escape:tt)* }, internal { $($internal:tt)* }, #back_comma_props) => {
+                  ::origami_engine::anon! {
+                      $($internal)*,
+                      childrens $($escape)* {
+                          #ts
+                      }
+                  }
+              };
               (#back_comma_props) => {{
                   let mut s = String::new();
                   ::origami_engine::anon! {
-                      #ts
-                  }
-                  ::origami_engine::Origami(s)
-              }};
-              (noescape #front_comma_props) => {{
-                  let mut s = String::new();
-                  ::origami_engine::anon! {
-                      noescape,
-                      #ts
+                      childrens {
+                          #ts
+                      }
                   }
                   ::origami_engine::Origami(s)
               }};
               (cap => $capacity:expr #front_comma_props) => {{
                   let mut s = String::with_capacity($capacity);
                   ::origami_engine::anon! {
-                      #ts
+                      childrens {
+                          #ts
+                      }
                   }
                   ::origami_engine::Origami(s)
               }};
-              (noescape, cap => $capacity:expr #front_comma_props) => {{
-                  let mut s = String::with_capacity($capacity);
-                  ::origami_engine::anon! {
-                      noescape,
-                      #ts
-                  }
-                  ::origami_engine::Origami(s)
-              }};
-              (literals { $($concat_args:tt)* }, return $return_ident:ident, bubble_up_ident $bubble_up_ident:ident, $s:expr => #back_comma_props) => {
-                  ::origami_engine::anon! {
-                      literals { $($concat_args)* },
-                      return $return_ident,
-                      bubble_up_ident $bubble_up_ident,
-                      $s,
-                      #ts
-                  }
-              };
-              (literals { $($concat_args:tt)* }, return $return_ident:ident, bubble_up_ident $bubble_up_ident:ident, noescape, $s:expr => #back_comma_props) => {
-                  ::origami_engine::anon! {
-                      literals { $($concat_args)* },
-                      return $return_ident,
-                      bubble_up_ident $bubble_up_ident,
-                      noescape,
-                      $s,
-                      #ts
-                  }
-              };
             }
         });
     }

@@ -4,9 +4,12 @@ pub mod kw {
     custom_keyword!(size_hint);
     custom_keyword!(escape);
     custom_keyword!(noescape);
-    custom_keyword!(literals);
+    custom_keyword!(concat_args);
+    custom_keyword!(concat_args_ident);
     custom_keyword!(bubble_up_ident);
     custom_keyword!(call);
+    custom_keyword!(string);
+    custom_keyword!(childrens);
 }
 
 macro_rules! bail {

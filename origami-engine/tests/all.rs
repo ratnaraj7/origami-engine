@@ -347,11 +347,11 @@ fn should_not_minify_style() {
 
 #[cfg(feature = "minify_html")]
 #[test]
-fn should_move_script_when_minify_html_is_enabled() {
+fn should_bubble_up_script() {
     comp! {
-        bar =>
+        baz =>
         div {
-            "bar_component"
+            "baz_component"
             script bubble_up {
                 r#"function foo() {
                     return "hello world";
@@ -359,6 +359,15 @@ fn should_move_script_when_minify_html_is_enabled() {
             }
         }
     }
+
+    comp! {
+        bar =>
+        div {
+            "bar_component"
+            call baz {}
+        }
+    }
+
     comp! {
         foo =>
         div {
@@ -366,20 +375,21 @@ fn should_move_script_when_minify_html_is_enabled() {
             call bar {}
         }
     }
+
     let html = foo!();
     assert_eq!(
         html.0,
-        "<div>foo_component<div>bar_component</div></div><script>function foo() { return \"hello world\"; }</script>"
+        "<div>foo_component<div>bar_component<div>baz_component</div></div></div><script>function foo() { return \"hello world\"; }</script>"
     );
 }
 
 #[cfg(not(feature = "minify_html"))]
 #[test]
-fn should_move_script_when_minify_html_is_not_enabled() {
+fn should_bubble_up_script_when_minify_is_disabled() {
     comp! {
-        bar =>
+        baz =>
         div {
-            "bar_component"
+            "baz_component"
             script bubble_up {
                 r#"function foo() {
                     return "hello world";
@@ -387,6 +397,15 @@ fn should_move_script_when_minify_html_is_not_enabled() {
             }
         }
     }
+
+    comp! {
+        bar =>
+        div {
+            "bar_component"
+            call baz {}
+        }
+    }
+
     comp! {
         foo =>
         div {
@@ -394,10 +413,11 @@ fn should_move_script_when_minify_html_is_not_enabled() {
             call bar {}
         }
     }
+
     let html = foo!();
     assert_eq!(
         html.0,
-        r#"<div>foo_component<div>bar_component</div></div><script>function foo() {
+        r#"<div>foo_component<div>bar_component<div>baz_component</div></div></div><script>function foo() {
                     return "hello world";
                 }</script>"#
     );
