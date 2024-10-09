@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::{Comma, If};
-use syn::{braced, parse_quote, Expr, Ident, LitStr, Pat, Token};
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Pat, Path, Token};
 
 use crate::utils::bail;
 use crate::utils::kw::call;
@@ -71,7 +71,7 @@ pub(super) enum Children {
         escape: bool,
     },
     CompCall {
-        comp: Ident,
+        comp: Path,
         ts: TokenStream,
         #[cfg(feature = "html_escape")]
         escape: bool,

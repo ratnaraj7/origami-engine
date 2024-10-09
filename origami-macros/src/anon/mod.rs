@@ -4,7 +4,8 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 use rand::prelude::*;
 use syn::parse::Parse;
-use syn::{braced, parse_quote, Expr, Ident, LitStr, Token};
+use syn::spanned::Spanned;
+use syn::{braced, parse_quote, Expr, Ident, LitStr, Path, Token};
 
 mod children;
 
@@ -349,7 +350,7 @@ impl Extend<'_> {
 
     fn extend_comp_call(
         &mut self,
-        comp: &Ident,
+        comp: &Path,
         comp_ts: &TokenStream,
         #[cfg(feature = "html_escape")] escape: bool,
     ) {
@@ -364,11 +365,21 @@ impl Extend<'_> {
         let mut rng = rand::thread_rng();
         let random_number: u64 = rng.gen();
         let concat_args_ident = Ident::new(
-            format!("{}_return_{}", comp, random_number).as_str(),
+            format!(
+                "{}_return_{}",
+                comp.segments.last().expect("Invalid path").ident,
+                random_number
+            )
+            .as_str(),
             comp.span(),
         );
         let bubble_up_ident = Ident::new(
-            format!("{}_script_{}", comp, random_number).as_str(),
+            format!(
+                "{}_script_{}",
+                comp.segments.last().expect("Invalid path").ident,
+                random_number
+            )
+            .as_str(),
             comp.span(),
         );
         let concat_args = &mut self.concat_args;
