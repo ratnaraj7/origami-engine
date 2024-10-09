@@ -422,3 +422,24 @@ fn should_bubble_up_script_when_minify_is_disabled() {
                 }</script>"#
     );
 }
+
+#[cfg(feature = "minify_html")]
+#[test]
+fn should_bubble_up_script_in_self() {
+    comp! {
+        baz =>
+        div {
+            "baz_component"
+            script bubble_up {
+                r#"function foo() {
+                    return "hello world";
+                }"#
+            }
+        }
+    }
+    let html = baz!();
+    assert_eq!(
+        html.0,
+        "<div>baz_component</div><script>function foo() { return \"hello world\"; }</script>"
+    );
+}

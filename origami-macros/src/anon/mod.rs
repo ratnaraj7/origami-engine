@@ -114,11 +114,7 @@ impl Parse for Anon {
 impl ToTokens for Anon {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut bubble_up_script_calls = TokenStream::new();
-        let mut bubble_up_ts = if self.bubble_up_ident.is_some() {
-            Some(TokenStream::new())
-        } else {
-            None
-        };
+        let mut bubble_up_ts = TokenStream::new();
         let mut concat_args = self.concat_args.clone().unwrap_or_default();
         let mut extend = Extend {
             bubble_up_ts: &mut bubble_up_ts,
@@ -149,6 +145,7 @@ impl ToTokens for Anon {
                 }
             });
         } else {
+            tokens.extend(bubble_up_ts);
             tokens.extend(bubble_up_script_calls);
         }
     }
@@ -171,7 +168,7 @@ enum ProcessType {
 
 struct Extend<'a> {
     ts: &'a mut TokenStream,
-    bubble_up_ts: &'a mut Option<TokenStream>,
+    bubble_up_ts: &'a mut TokenStream,
     bubble_up_script_calls: &'a mut TokenStream,
     s: &'a Expr,
     concat_args: &'a mut TokenStream,
@@ -571,12 +568,12 @@ impl Extend<'_> {
         bubble_up: bool,
         #[cfg(feature = "minify_html")] minify: bool,
     ) {
-        if let (Some(b_ts), true) = (self.bubble_up_ts.as_mut(), bubble_up) {
+        if bubble_up {
             let mut temp_concat_args = TokenStream::new();
-            let mut bubble_up_ts = None;
+            let mut bubble_up_ts = TokenStream::new();
             let mut temp_extend = Extend {
                 s: self.s,
-                ts: b_ts,
+                ts: self.bubble_up_ts,
                 concat_args: &mut temp_concat_args,
                 bubble_up_ts: &mut bubble_up_ts,
                 bubble_up_script_calls: self.bubble_up_script_calls,
