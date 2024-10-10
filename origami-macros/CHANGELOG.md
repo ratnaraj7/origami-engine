@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.8...origami-macros-v0.1.0-alpha.9) - 2024-10-10
+
+### Added
+
+- [**breaking**] add ability to add vis to comps
+
+### Fixed
+
+- [**breaking**] make scripts/styles unescapeable
+
 ## [0.1.0-alpha.8](https://github.com/ratnaraj7/origami-engine/compare/origami-macros-v0.1.0-alpha.7...origami-macros-v0.1.0-alpha.8) - 2024-10-10
 
 ### Fixed
