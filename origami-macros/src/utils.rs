@@ -6,10 +6,12 @@ pub mod kw {
     custom_keyword!(noescape);
     custom_keyword!(concat_args);
     custom_keyword!(concat_args_ident);
-    custom_keyword!(bubble_up_ident);
     custom_keyword!(call);
     custom_keyword!(string);
     custom_keyword!(childrens);
+    custom_keyword!(script);
+    custom_keyword!(style);
+    custom_keyword!(i);
 }
 
 macro_rules! bail {
