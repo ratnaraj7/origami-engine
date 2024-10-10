@@ -54,31 +54,31 @@ fn bench_minify(c: &mut Criterion) {
             "function foo() { return \"hello world\"; }"
         }
     }
-    let expr = "function foo() { return \"hello world\"; }";
-    comp! {
-        expression_without_minify =>
-        script nominify {
-            expr
-        }
-    }
-    comp! {
-        expression_with_minify =>
-        script {
-            expr
-        }
-    }
+    //let expr = "function foo() { return \"hello world\"; }";
+    //comp! {
+    //    expression_without_minify =>
+    //    script nominify {
+    //        expr
+    //    }
+    //}
+    //comp! {
+    //    expression_with_minify =>
+    //    script {
+    //        expr
+    //    }
+    //}
     c.bench_function("literal without minify", |b| {
         b.iter(|| black_box(literal_without_minify!(cap => 100)))
     });
     c.bench_function("literal with minify", |b| {
         b.iter(|| black_box(literal_with_minify!(cap => 100)))
     });
-    c.bench_function("expression without minify", |b| {
-        b.iter(|| black_box(expression_without_minify!(cap => 100)))
-    });
-    c.bench_function("expression with minify", |b| {
-        b.iter(|| black_box(expression_with_minify!(cap => 100)))
-    });
+    //c.bench_function("expression without minify", |b| {
+    //    b.iter(|| black_box(expression_without_minify!(cap => 100)))
+    //});
+    //c.bench_function("expression with minify", |b| {
+    //    b.iter(|| black_box(expression_with_minify!(cap => 100)))
+    //});
 }
 
 fn bench_full_page(c: &mut Criterion) {

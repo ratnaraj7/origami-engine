@@ -1,15 +1,17 @@
 use std::fmt::Debug;
+use std::fs::File;
+use std::io::Read;
 
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::{Comma, If};
-use syn::{braced, parse_quote, Expr, Ident, LitStr, Pat, Path, Token};
+use syn::{braced, Expr, Ident, LitStr, Pat, Path, Token};
 
-use crate::utils::bail;
-use crate::utils::kw::call;
+use crate::utils::kw::{call, i, script, style};
 #[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
+use crate::utils::{bail, combine_to_lit};
 
 pub(super) mod attributes;
 pub(super) use self::attributes::{AttributeKey, Attributes};
@@ -47,15 +49,6 @@ pub(super) struct CustomMatchArm {
     pub(super) pat: Pat,
     pub(super) guard: Option<(If, Expr)>,
     pub(super) comma: Option<Comma>,
-}
-
-/// Represents the content of a script or style tag,
-/// which can either be an expression (`Expr`) or a literal string (`LitStr`).
-#[derive(Debug)]
-pub enum ScriptOrStyleContent {
-    Expr(Expr),
-    LitStr(LitStr),
-    Empty,
 }
 
 #[derive(Debug)]
@@ -96,14 +89,13 @@ pub(super) enum Children {
         arms: Vec<CustomMatchArm>,
     },
     Script {
-        ty: ScriptOrStyleContent,
+        text: Option<LitStr>,
         attrs: Attributes,
-        bubble_up: bool,
         #[cfg(feature = "minify_html")]
         minify: bool,
     },
     Style {
-        ty: ScriptOrStyleContent,
+        text: Option<LitStr>,
         attrs: Attributes,
         #[cfg(feature = "minify_html")]
         minify: bool,
@@ -112,18 +104,14 @@ pub(super) enum Children {
 
 impl Children {
     pub fn parse(input: ParseStream, pc: &mut Context) -> syn::Result<Self> {
-        if input.peek(LitStr) {
-            let text: LitStr = input.parse()?;
-            return Ok(Children::Text {
-                text,
-                #[cfg(feature = "html_escape")]
-                escape: if input.peek(Token![!]) {
-                    input.parse::<Token![!]>()?;
-                    false
-                } else {
-                    pc.escape
-                },
-            });
+        if input.peek(LitStr) || input.peek(i) {
+            return parse_text(input, pc);
+        }
+        if input.peek(style) {
+            return parse_style(input);
+        }
+        if input.peek(script) {
+            return parse_script(input);
         }
         if input.peek(call) {
             return parse_component(input, pc);
@@ -174,6 +162,32 @@ fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
         childrens.push(Children::parse(&content, pc)?);
     }
     Ok(childrens)
+}
+
+#[allow(unused_variables)]
+fn parse_text(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
+    let text = if input.peek(i) {
+        input.parse::<i>()?;
+        let path: LitStr = input.parse()?;
+        let mut s = String::new();
+        File::open(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path.value()))
+            .map_err(|e| syn::Error::new(path.span(), e))?
+            .read_to_string(&mut s)
+            .map_err(|e| syn::Error::new(path.span(), e))?;
+        combine_to_lit!(path.span() => s)
+    } else {
+        input.parse()?
+    };
+    Ok(Children::Text {
+        text,
+        #[cfg(feature = "html_escape")]
+        escape: if input.peek(Token![!]) {
+            input.parse::<Token![!]>()?;
+            false
+        } else {
+            pc.escape
+        },
+    })
 }
 
 fn parse_component(
@@ -241,59 +255,89 @@ fn parse_for(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     })
 }
 
+fn parse_script(input: ParseStream) -> syn::Result<Children> {
+    input.parse::<script>()?;
+    let attrs: Attributes = input.parse()?;
+    #[cfg(feature = "html_escape")]
+    if attrs.0.contains_key(&AttributeKey::Escape) || attrs.0.contains_key(&AttributeKey::NoEscape)
+    {
+        bail!(
+            input,
+            "Cannot use `escape` or `noescape` with `script` or `style`"
+        );
+    }
+    #[cfg(feature = "minify_html")]
+    let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
+    let mut ctx = Context {
+        #[cfg(feature = "html_escape")]
+        escape: false,
+    };
+    let content;
+    braced!(content in input);
+    let text = if !content.is_empty() {
+        match parse_text(&content, &mut ctx)? {
+            Children::Text { text, .. } => {
+                if !content.is_empty() {
+                    bail!(input, "Expected end of `script` block");
+                }
+                Some(text)
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        None
+    };
+    Ok(Children::Script {
+        attrs,
+        text,
+        #[cfg(feature = "minify_html")]
+        minify,
+    })
+}
+
+fn parse_style(input: ParseStream) -> syn::Result<Children> {
+    input.parse::<style>()?;
+    let attrs: Attributes = input.parse()?;
+    #[cfg(feature = "html_escape")]
+    if attrs.0.contains_key(&AttributeKey::Escape) || attrs.0.contains_key(&AttributeKey::NoEscape)
+    {
+        bail!(
+            input,
+            "Cannot use `escape` or `noescape` with `script` or `style`"
+        );
+    }
+    #[cfg(feature = "minify_html")]
+    let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
+    let mut ctx = Context {
+        #[cfg(feature = "html_escape")]
+        escape: false,
+    };
+    let content;
+    braced!(content in input);
+    let text = if !content.is_empty() {
+        match parse_text(&content, &mut ctx)? {
+            Children::Text { text, .. } => {
+                if !content.is_empty() {
+                    bail!(input, "Expected end of `style` block");
+                }
+                Some(text)
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        None
+    };
+    Ok(Children::Style {
+        attrs,
+        text,
+        #[cfg(feature = "minify_html")]
+        minify,
+    })
+}
+
 fn parse_html(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
     let tag: Ident = input.parse()?;
     let attrs: Attributes = input.parse()?;
-    if tag == "script" || tag == "style" {
-        #[cfg(feature = "html_escape")]
-        if attrs.0.contains_key(&AttributeKey::Escape)
-            || attrs.0.contains_key(&AttributeKey::NoEscape)
-        {
-            bail!(
-                input,
-                "Cannot use `escape` or `noescape` with `script` or `style`"
-            );
-        }
-        let content;
-        braced!(content in input);
-        let ty = if content.peek(LitStr) {
-            ScriptOrStyleContent::LitStr(content.parse()?)
-        } else if content.is_empty() {
-            ScriptOrStyleContent::Empty
-        } else {
-            ScriptOrStyleContent::Expr(content.parse()?)
-        };
-        #[cfg(feature = "minify_html")]
-        let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
-        if tag == "script" {
-            let bubble_up = if let Some(attr_val) =
-                attrs.0.get(&AttributeKey::Ident(parse_quote!(bubble_up)))
-            {
-                if attr_val.is_some() {
-                    bail!(input, "bubble_up should not have a value");
-                }
-                true
-            } else {
-                false
-            };
-            return Ok(Children::Script {
-                bubble_up,
-                ty,
-                attrs,
-                #[cfg(feature = "minify_html")]
-                minify,
-            });
-        }
-        if tag == "style" {
-            return Ok(Children::Style {
-                ty,
-                attrs,
-                #[cfg(feature = "minify_html")]
-                minify,
-            });
-        }
-        unreachable!()
-    }
     #[cfg(feature = "html_escape")]
     if attrs.0.contains_key(&AttributeKey::Escape) {
         pc.escape = true;

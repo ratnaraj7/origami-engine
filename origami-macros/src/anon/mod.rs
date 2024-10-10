@@ -10,22 +10,19 @@ use syn::{braced, parse_quote, Expr, Ident, LitStr, Path, Token};
 mod children;
 
 use crate::anon::children::CustomMatchArm;
-use crate::utils::kw::{bubble_up_ident, childrens, concat_args, concat_args_ident, string};
+use crate::utils::kw::{childrens, concat_args, concat_args_ident, string};
 #[cfg(feature = "html_escape")]
 use crate::utils::kw::{escape, noescape};
 use crate::utils::{bail, combine_to_lit};
 
 use self::children::attributes::AttributeValue;
-use self::children::{
-    AttributeKey, Attributes, Children, Childrens, Context, HtmlChildrens, ScriptOrStyleContent,
-};
+use self::children::{AttributeKey, Attributes, Children, Childrens, Context, HtmlChildrens};
 
 pub struct Anon {
     expr: Expr,
     childrens: Childrens,
     concat_args: Option<TokenStream>,
     concat_args_return_ident: Option<Ident>,
-    bubble_up_ident: Option<Ident>,
 }
 
 impl Parse for Anon {
@@ -33,7 +30,6 @@ impl Parse for Anon {
         let mut anon = Self {
             concat_args_return_ident: None,
             concat_args: None,
-            bubble_up_ident: None,
             childrens: Vec::new(),
             expr: parse_quote!(s),
         };
@@ -62,15 +58,6 @@ impl Parse for Anon {
                 let content;
                 braced!(content in input);
                 anon.concat_args = Some(content.parse()?);
-                count += 1;
-                continue;
-            }
-            if input.peek(bubble_up_ident) {
-                if anon.bubble_up_ident.is_some() {
-                    bail!(input, "duplicate `bubble_up_ident`");
-                }
-                input.parse::<bubble_up_ident>()?;
-                anon.bubble_up_ident = Some(input.parse()?);
                 count += 1;
                 continue;
             }
@@ -113,12 +100,8 @@ impl Parse for Anon {
 
 impl ToTokens for Anon {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut bubble_up_script_calls = TokenStream::new();
-        let mut bubble_up_ts = TokenStream::new();
         let mut concat_args = self.concat_args.clone().unwrap_or_default();
         let mut extend = Extend {
-            bubble_up_ts: &mut bubble_up_ts,
-            bubble_up_script_calls: &mut bubble_up_script_calls,
             concat_args: &mut concat_args,
             ts: tokens,
             s: &self.expr,
@@ -135,19 +118,6 @@ impl ToTokens for Anon {
         } else {
             extend.concat_args_to_concat();
         }
-        if let Some(ident) = &self.bubble_up_ident {
-            tokens.extend(quote! {
-                macro_rules! #ident {
-                    () => {
-                        #bubble_up_script_calls
-                        #bubble_up_ts
-                    }
-                }
-            });
-        } else {
-            tokens.extend(bubble_up_ts);
-            tokens.extend(bubble_up_script_calls);
-        }
     }
 }
 
@@ -155,7 +125,6 @@ impl ToTokens for Anon {
 enum Minify {
     Script,
     Style,
-    None,
 }
 
 enum ProcessType {
@@ -168,8 +137,6 @@ enum ProcessType {
 
 struct Extend<'a> {
     ts: &'a mut TokenStream,
-    bubble_up_ts: &'a mut TokenStream,
-    bubble_up_script_calls: &'a mut TokenStream,
     s: &'a Expr,
     concat_args: &'a mut TokenStream,
 }
@@ -185,8 +152,6 @@ impl Extend<'_> {
             let mut temp_ts = TokenStream::new();
             let mut temp_extend_context = Extend {
                 ts: &mut temp_ts,
-                bubble_up_ts: self.bubble_up_ts,
-                bubble_up_script_calls: self.bubble_up_script_calls,
                 s: self.s,
                 concat_args: self.concat_args,
             };
@@ -246,26 +211,24 @@ impl Extend<'_> {
                     } => self.extend_html(tag, attrs, childrens),
                     Children::Match { expr, arms } => self.extend_match(expr, arms),
                     Children::Style {
-                        ty,
+                        text,
                         attrs,
                         #[cfg(feature = "minify_html")]
                         minify,
                     } => self.extend_style(
-                        ty,
+                        text,
                         attrs,
                         #[cfg(feature = "minify_html")]
                         *minify,
                     ),
                     Children::Script {
-                        bubble_up,
-                        ty,
+                        text,
                         attrs,
                         #[cfg(feature = "minify_html")]
                         minify,
                     } => self.extend_script(
-                        ty,
+                        text,
                         attrs,
-                        *bubble_up,
                         #[cfg(feature = "minify_html")]
                         *minify,
                     ),
@@ -370,15 +333,6 @@ impl Extend<'_> {
             .as_str(),
             comp.span(),
         );
-        let bubble_up_ident = Ident::new(
-            format!(
-                "{}_script_{}",
-                comp.segments.last().expect("Invalid path").ident,
-                random_number
-            )
-            .as_str(),
-            comp.span(),
-        );
         let concat_args = &mut self.concat_args;
         let s = self.s;
         self.ts.extend(quote! {
@@ -390,14 +344,10 @@ impl Extend<'_> {
                         #concat_args
                     },
                     concat_args_ident #concat_args_ident,
-                    bubble_up_ident #bubble_up_ident,
                     string #s
                 },
                 #comp_ts
             }
-        });
-        self.bubble_up_script_calls.extend(quote! {
-            #bubble_up_ident!();
         });
         **concat_args = quote! {
             #concat_args_ident!(),
@@ -511,8 +461,6 @@ impl Extend<'_> {
             s: self.s,
             ts: &mut temp,
             concat_args: self.concat_args,
-            bubble_up_ts: self.bubble_up_ts,
-            bubble_up_script_calls: self.bubble_up_script_calls,
         };
         for CustomMatchArm {
             body,
@@ -546,102 +494,51 @@ impl Extend<'_> {
 
     fn extend_style(
         &mut self,
-        ty: &ScriptOrStyleContent,
+        text: &Option<LitStr>,
         attrs: &Attributes,
         #[cfg(feature = "minify_html")] minify: bool,
     ) {
         self.extend_concat_args(&combine_to_lit!("<style"), ProcessType::None);
         self.extend_attributes(attrs);
         self.extend_concat_args(&combine_to_lit!(">"), ProcessType::None);
-        self.extend_style_script_contents(
-            ty,
-            #[cfg(feature = "minify_html")]
-            if minify { Minify::Style } else { Minify::None },
-        );
+        if let Some(text) = text {
+            self.extend_concat_args(text, {
+                #[allow(unused)]
+                let mut process_type = ProcessType::None;
+                #[cfg(feature = "minify_html")]
+                {
+                    if minify {
+                        process_type = ProcessType::Minify(Minify::Style);
+                    }
+                }
+                process_type
+            });
+        }
         self.extend_concat_args(&combine_to_lit!("</style>"), ProcessType::None);
     }
 
     fn extend_script(
         &mut self,
-        ty: &ScriptOrStyleContent,
+        text: &Option<LitStr>,
         attrs: &Attributes,
-        bubble_up: bool,
         #[cfg(feature = "minify_html")] minify: bool,
     ) {
-        if bubble_up {
-            let mut temp_concat_args = TokenStream::new();
-            let mut bubble_up_ts = TokenStream::new();
-            let mut temp_extend = Extend {
-                s: self.s,
-                ts: self.bubble_up_ts,
-                concat_args: &mut temp_concat_args,
-                bubble_up_ts: &mut bubble_up_ts,
-                bubble_up_script_calls: self.bubble_up_script_calls,
-            };
-            temp_extend.extend_concat_args(&combine_to_lit!("<script"), ProcessType::None);
-            temp_extend.extend_attributes(attrs);
-            temp_extend.extend_concat_args(&combine_to_lit!(">"), ProcessType::None);
-            temp_extend.extend_style_script_contents(
-                ty,
+        self.extend_concat_args(&combine_to_lit!("<script"), ProcessType::None);
+        self.extend_attributes(attrs);
+        self.extend_concat_args(&combine_to_lit!(">"), ProcessType::None);
+        if let Some(text) = text {
+            self.extend_concat_args(text, {
+                #[allow(unused)]
+                let mut process_type = ProcessType::None;
                 #[cfg(feature = "minify_html")]
-                if minify { Minify::Script } else { Minify::None },
-            );
-            temp_extend.extend_concat_args(&combine_to_lit!("</script>"), ProcessType::None);
-            temp_extend.concat_args_to_concat();
-        } else {
-            self.extend_concat_args(&combine_to_lit!("<script"), ProcessType::None);
-            self.extend_attributes(attrs);
-            self.extend_concat_args(&combine_to_lit!(">"), ProcessType::None);
-            self.extend_style_script_contents(
-                ty,
-                #[cfg(feature = "minify_html")]
-                if minify { Minify::Script } else { Minify::None },
-            );
-            self.extend_concat_args(&combine_to_lit!("</script>"), ProcessType::None);
-        }
-    }
-
-    fn extend_style_script_contents(
-        &mut self,
-        ty: &ScriptOrStyleContent,
-        #[cfg(feature = "minify_html")] minify: Minify,
-    ) {
-        #[allow(unused)]
-        let mut process_type = ProcessType::None;
-        #[cfg(feature = "minify_html")]
-        {
-            process_type = ProcessType::Minify(minify);
-        }
-        match ty {
-            ScriptOrStyleContent::LitStr(lit) => {
-                self.extend_concat_args(lit, process_type);
-            }
-            ScriptOrStyleContent::Expr(expr) => {
-                self.concat_args_to_concat();
-                let s = self.s;
-                match process_type {
-                    #[cfg(feature = "minify_html")]
-                    ProcessType::Minify(Minify::Script) => {
-                        self.ts.extend(quote! {{
-                            let temp_s = String::from_utf8_lossy(::origami_engine::minify(#expr.as_bytes(), &::origami_engine::Cfg{minify_js: true, ..Default::default()}).as_slice()).to_string();
-                            #s.push_str(temp_s.as_str());
-                        }});
-                    }
-                    #[cfg(feature = "minify_html")]
-                    ProcessType::Minify(Minify::Style) => {
-                        self.ts.extend(quote! {{
-                            let temp_s = String::from_utf8_lossy(::origami_engine::minify(#expr.as_bytes(), &::origami_engine::Cfg{minify_css: true, ..Default::default()}).as_slice()).to_string();
-                            #s.push_str(temp_s.as_str());
-                        }});
-                    }
-                    _ => {
-                        self.ts.extend(quote! {
-                            #s.push_str(#expr);
-                        });
+                {
+                    if minify {
+                        process_type = ProcessType::Minify(Minify::Script);
                     }
                 }
-            }
-            ScriptOrStyleContent::Empty => {}
+                process_type
+            });
         }
+        self.extend_concat_args(&combine_to_lit!("</script>"), ProcessType::None);
     }
 }

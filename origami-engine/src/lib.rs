@@ -227,52 +227,6 @@
 //!     assert_eq!(html.0, "<div><div>foo</div></div>");
 //! }
 //! ```
-//!
-//! ## Bubble up scripts
-//!
-//! Bubble up the scripts to the top most component using `bubble_up` attribute.
-//!
-//! ## Example
-//!
-//! ```rust
-//! use origami_engine::comp;
-//!
-//! comp! {
-//!     bar =>
-//!     div {
-//!         "bar_component"
-//!         script bubble_up {
-//!             r#"function foo() {
-//!                 return "hello world";
-//!             }"#
-//!         }
-//!     }
-//! }
-//!
-//! comp! {
-//!     foo =>
-//!     div {
-//!         "foo_component"
-//!         call bar {} // Include the bar component
-//!     }
-//! }
-//!
-//! let html = foo!();
-//!
-//! #[cfg(not(feature = "minify_html"))]
-//! assert_eq!(
-//!     html.0,
-//!     r#"<div>foo_component<div>bar_component</div></div><script>function foo() {
-//!                 return "hello world";
-//!             }</script>"#
-//! );
-//!
-//! #[cfg(feature = "minify_html")]
-//! assert_eq!(
-//!     html.0,
-//!     "<div>foo_component<div>bar_component</div></div><script>function foo() { return \"hello world\"; }</script>"
-//! );
-//! ```
 
 pub use origami_macros::anon;
 pub use origami_macros::comp;
