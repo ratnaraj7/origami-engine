@@ -70,7 +70,9 @@ impl Parse for AttributeValue {
         }
         if input.peek(Token![@]) {
             input.parse::<Token![@]>()?;
-            return Ok(Self::Expr(input.parse()?));
+            let expr = input.parse()?;
+            input.parse::<Token![;]>()?;
+            return Ok(Self::Expr(expr));
         }
         bail!(input, "Expected string or expression.")
     }

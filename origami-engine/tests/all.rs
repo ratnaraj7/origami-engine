@@ -49,6 +49,22 @@ fn should_order_attributes_correctly_when_using_placeholder() {
 }
 
 #[test]
+fn should_work_attribute_with_expression() {
+    comp! {
+        component(bar) =>
+        div hello="world" abc="def" foo=@bar; {}
+    }
+    let bar = "xyz";
+    let html = component!(bar {
+        @bar;
+    });
+    assert_eq!(
+        html.0,
+        "<div hello=\"world\" abc=\"def\" foo=\"xyz\"></div>"
+    );
+}
+
+#[test]
 fn should_work_with_multiple_nested_components() {
     comp! {
         foo =>
