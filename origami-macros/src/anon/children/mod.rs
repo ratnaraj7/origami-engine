@@ -254,25 +254,12 @@ fn parse_script(input: ParseStream) -> syn::Result<Children> {
     }
     #[cfg(feature = "minify_html")]
     let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
-    let mut ctx = Context {
-        #[cfg(feature = "html_escape")]
-        escape: false,
-    };
     let content;
     braced!(content in input);
-    let text = if !content.is_empty() {
-        match parse_text(&content, &mut ctx)? {
-            Children::Text { text, .. } => {
-                if !content.is_empty() {
-                    bail!(input, "Expected end of `script` block");
-                }
-                Some(text)
-            }
-            _ => unreachable!(),
-        }
-    } else {
-        None
-    };
+    let text = content.parse()?;
+    if !content.is_empty() {
+        bail!(content, "Expected end of `script` block");
+    }
     Ok(Children::Script {
         attrs,
         text,
@@ -294,25 +281,12 @@ fn parse_style(input: ParseStream) -> syn::Result<Children> {
     }
     #[cfg(feature = "minify_html")]
     let minify = !attrs.0.contains_key(&AttributeKey::NoMinify);
-    let mut ctx = Context {
-        #[cfg(feature = "html_escape")]
-        escape: false,
-    };
     let content;
     braced!(content in input);
-    let text = if !content.is_empty() {
-        match parse_text(&content, &mut ctx)? {
-            Children::Text { text, .. } => {
-                if !content.is_empty() {
-                    bail!(input, "Expected end of `style` block");
-                }
-                Some(text)
-            }
-            _ => unreachable!(),
-        }
-    } else {
-        None
-    };
+    let text = content.parse()?;
+    if !content.is_empty() {
+        bail!(content, "Expected end of `style` block");
+    }
     Ok(Children::Style {
         attrs,
         text,
