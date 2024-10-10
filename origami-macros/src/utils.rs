@@ -11,7 +11,6 @@ pub mod kw {
     custom_keyword!(childrens);
     custom_keyword!(script);
     custom_keyword!(style);
-    custom_keyword!(i);
 }
 
 macro_rules! bail {

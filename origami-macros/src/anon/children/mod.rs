@@ -1,6 +1,4 @@
 use std::fmt::Debug;
-use std::fs::File;
-use std::io::Read;
 
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
@@ -8,10 +6,10 @@ use syn::spanned::Spanned;
 use syn::token::{Comma, If};
 use syn::{braced, Expr, Ident, LitStr, Pat, Path, Token};
 
-use crate::utils::kw::{call, i, script, style};
+use crate::utils::bail;
+use crate::utils::kw::{call, script, style};
 #[cfg(feature = "minify_html")]
 use crate::utils::kw::{escape, noescape};
-use crate::utils::{bail, combine_to_lit};
 
 pub(super) mod attributes;
 pub(super) use self::attributes::{AttributeKey, Attributes};
@@ -104,7 +102,7 @@ pub(super) enum Children {
 
 impl Children {
     pub fn parse(input: ParseStream, pc: &mut Context) -> syn::Result<Self> {
-        if input.peek(LitStr) || input.peek(i) {
+        if input.peek(LitStr) {
             return parse_text(input, pc);
         }
         if input.peek(style) {
@@ -166,20 +164,8 @@ fn parse_block(input: ParseStream, pc: &mut Context) -> syn::Result<Childrens> {
 
 #[allow(unused_variables)]
 fn parse_text(input: ParseStream, pc: &mut Context) -> syn::Result<Children> {
-    let text = if input.peek(i) {
-        input.parse::<i>()?;
-        let path: LitStr = input.parse()?;
-        let mut s = String::new();
-        File::open(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path.value()))
-            .map_err(|e| syn::Error::new(path.span(), e))?
-            .read_to_string(&mut s)
-            .map_err(|e| syn::Error::new(path.span(), e))?;
-        combine_to_lit!(path.span() => s)
-    } else {
-        input.parse()?
-    };
     Ok(Children::Text {
-        text,
+        text: input.parse()?,
         #[cfg(feature = "html_escape")]
         escape: if input.peek(Token![!]) {
             input.parse::<Token![!]>()?;
