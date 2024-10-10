@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3-alpha.7](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.3-alpha.6...origami-engine-v0.1.3-alpha.7) - 2024-10-10
+
+### Added
+
+- [**breaking**] add ability to add vis to comps
+
 ## [0.1.3-alpha.6](https://github.com/ratnaraj7/origami-engine/compare/origami-engine-v0.1.3-alpha.5...origami-engine-v0.1.3-alpha.6) - 2024-10-10
 
 ### Fixed
