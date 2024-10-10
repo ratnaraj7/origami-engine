@@ -3,11 +3,12 @@ use proc_macro2::{Delimiter, TokenTree};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::token::Paren;
-use syn::{parenthesized, Ident, Token};
+use syn::{parenthesized, Ident, Token, Visibility};
 
 use crate::utils::bail;
 
 pub struct Component {
+    vis: Visibility,
     name: syn::Ident,
     ts: proc_macro2::TokenStream,
     props: IndexSet<Ident>,
@@ -15,6 +16,7 @@ pub struct Component {
 
 impl Parse for Component {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let vis = input.parse()?;
         let name = input.parse()?;
         let mut props = IndexSet::new();
         if input.peek(Paren) {
@@ -42,7 +44,12 @@ impl Parse for Component {
         }
         input.parse::<Token![=>]>()?;
         let ts = macro_rep(input, &props)?;
-        Ok(Component { name, ts, props })
+        Ok(Component {
+            vis,
+            name,
+            ts,
+            props,
+        })
     }
 }
 
@@ -57,6 +64,14 @@ impl ToTokens for Component {
             #(#props {$($#props:tt)*}),*
         };
         let name = &self.name;
+        let vis = &self.vis;
+        let vis_t = {
+            if vis == &syn::Visibility::Inherited {
+                quote! {}
+            } else {
+                quote! { #vis use #name; }
+            }
+        };
         let ts = &self.ts;
         tokens.extend(quote! {
             macro_rules! #name {
@@ -87,6 +102,7 @@ impl ToTokens for Component {
                   ::origami_engine::Origami(s)
               }};
             }
+            #vis_t
         });
     }
 }

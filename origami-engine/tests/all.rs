@@ -360,3 +360,27 @@ fn should_not_minify_style() {
             </style>"#
     );
 }
+
+#[test]
+fn should_work_with_visibility() {
+    mod bar {
+        use origami_macros::comp;
+        comp! {
+            pub(super) bar =>
+            div {
+                "bar"
+            }
+        }
+    }
+    mod foo {
+        use origami_macros::comp;
+        comp! {
+            pub(super) foo =>
+            div {
+                call bar::bar {}
+            }
+        }
+    }
+    let html = foo::foo!();
+    assert_eq!(html.0, "<div><div>bar</div></div>");
+}
