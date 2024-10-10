@@ -3,7 +3,7 @@
 ### High Priority
 
 - [ ] Improve code quality
-- [ ] Use structs for generating tokens in anon module
+- [x] Use structs for generating tokens in anon module
 - [x] Refactor the code to improve logic, optimize performance, and enhance maintainability, as the initial implementation was focused on just making it work.
 - [x] Update attributes handling logic
 - [x] Implement pattern matching
@@ -16,7 +16,7 @@
 ### Medium Priority
 
 - [x] Minify scripts and styles using [`minify-html`](https://crates.io/crates/minify-html)
-- [x] Enable moving scripts and styles to desired positions when used inside components (if possible)
+- [x] ~~Enable moving scripts and styles to desired positions when used inside components (if possible)~~
 - [x] Write the README documentation
   - [ ] ~~Create a website in docs workspace based on the README using any markdown to HTML crates (like [pulldown-cmark](https://crates.io/crates/pulldown-cmark))~~
   - [ ] ~~Write doctests using [`skeptic`](https://crates.io/crates/skeptic)~~

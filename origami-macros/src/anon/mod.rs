@@ -408,9 +408,6 @@ impl Extend<'_> {
     fn extend_attributes(&mut self, attributes: &Attributes) {
         for (k, v) in &attributes.0 {
             match k {
-                AttributeKey::Ident(ident) if ident == "bubble_up" => {
-                    continue;
-                }
                 AttributeKey::Ident(ident) => {
                     self.extend_concat_args(
                         &combine_to_lit!(ident.span() => " ", ident.to_string()),
